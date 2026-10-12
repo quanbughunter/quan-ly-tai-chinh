@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Quản lý tài chính</title>
+  <meta name="description" content="Sổ thu chi, công nợ và đổi tiền cá nhân — dùng trên web và Android.">
+  <meta name="theme-color" content="#f4f1fb">
+  <meta name="color-scheme" content="light dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https: wss:; base-uri 'self'; form-action 'self'; object-src 'none'">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="js/theme-boot.js"></script>
+</head>
+<body>
+  <div id="app" class="app"><div class="splash"><div><i></i>Đang mở sổ…</div></div></div>
+  <noscript><p style="padding:24px">Ứng dụng cần bật JavaScript.</p></noscript>
+  <script src="config.js"></script>
+  <script src="vendor/supabase.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

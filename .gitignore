@@ -1,0 +1,10 @@
+node_modules/
+private/
+*.xlsx
+*.xls
+*.csv
+android/
+.env
+.DS_Store
+.clasp.json
+src/

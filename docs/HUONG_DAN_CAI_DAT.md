@@ -1,0 +1,109 @@
+# Hướng dẫn cài đặt từ đầu đến cuối
+
+Làm theo thứ tự. Mỗi bước có cách kiểm tra "đã xong chưa". Toàn bộ chi phí: 0 đồng (GitHub, Supabase và GitHub Actions đều có gói miễn phí đủ dùng cho một người).
+
+**Cần có:** tài khoản GitHub, GitHub Desktop, Node.js (đã cài), tài khoản Supabase (đăng ký bằng GitHub hoặc email), điện thoại Android.
+
+---
+
+## Bước 1. Tạo cơ sở dữ liệu trên Supabase
+
+1. Vào <https://supabase.com> → **New project**. Đặt tên tùy ý, chọn vùng gần nhất (ví dụ Singapore), tạo mật khẩu cơ sở dữ liệu (lưu vào trình quản lý mật khẩu; app không dùng đến mật khẩu này).
+2. Chờ 1–2 phút cho dự án khởi tạo.
+3. Menu trái → **SQL Editor** → **New query** → mở file `supabase/schema.sql`, dán toàn bộ nội dung → **Run**. Thấy "Success. No rows returned" là xong.
+   - Kiểm tra: **Table Editor** có bảng `records`, cạnh tên bảng không có cảnh báo "RLS disabled".
+
+## Bước 2. Tạo tài khoản đăng nhập của bạn và khóa đăng ký công khai
+
+1. **Authentication → Users → Add user → Create new user**: nhập email + mật khẩu của bạn, tick **Auto Confirm User**. Đây là tài khoản duy nhất dùng app.
+2. **Authentication → Sign In / Providers** (hoặc *Settings*, tùy giao diện Supabase hiện tại) → tắt **Allow new users to sign up**. Việc này ngăn người lạ tự tạo tài khoản trên dự án của bạn.
+   - Dù có ai đó biết địa chỉ web, họ cũng không đăng nhập được, và chính sách RLS (trong `schema.sql`) bảo đảm mỗi tài khoản chỉ đọc được dữ liệu của chính nó.
+
+## Bước 3. Điền cấu hình kết nối
+
+1. **Project Settings → API** (hoặc *Data API*): chép **Project URL** và khóa **anon / publishable** (khóa công khai).
+2. Mở `web/config.js`, dán vào:
+
+   ```js
+   window.APP_CONFIG = {
+     supabaseUrl: 'https://xxxxxxxx.supabase.co',
+     supabaseAnonKey: 'eyJ… hoặc sb_publishable_…',
+   };
+   ```
+
+> **Tuyệt đối không** dán khóa `service_role` hay `secret` vào file này. Khóa anon/publishable được phép công khai vì dữ liệu được bảo vệ bằng đăng nhập + RLS.
+
+Muốn thử trước khi kết nối? Để `config.js` trống: app chạy ở "chế độ thử" với dữ liệu giả, chỉ lưu trong trình duyệt. Chạy thử bằng `npm run serve` rồi mở <http://localhost:8080>.
+
+## Bước 4. Đẩy mã lên GitHub
+
+0. Trong thư mục dự án, chạy một lần: `npm run setup:workflows`. Lệnh này chép hai file workflow từ `setup/github-workflows/` vào `.github/workflows/` (GitHub chỉ chạy workflow ở đó).
+1. GitHub Desktop → **File → Add local repository** → chọn thư mục `D:\C1.CODING\myAPP\quan-ly-tai-chinh`. Nếu nó hỏi tạo repository, đồng ý.
+2. Kiểm tra danh sách file thay đổi: **không được có** `private/`, `*.xlsx`, `src/`, `.clasp.json`, `node_modules/` (đã nằm trong `.gitignore`). Nếu thấy chúng, dừng lại và hỏi.
+3. **Commit to main** → **Publish repository** (đặt tên, ví dụ `quan-ly-tai-chinh`). Repo công khai cũng được, vì mã nguồn không chứa dữ liệu của bạn.
+
+## Bước 5. Bật GitHub Pages (bản web)
+
+1. Trên github.com, vào repo → **Settings → Pages** → mục **Build and deployment → Source** chọn **GitHub Actions**.
+2. Tab **Actions** sẽ tự chạy workflow "Đưa web lên GitHub Pages" (vài phút). Nếu chưa chạy: workflow → **Run workflow**.
+3. Khi xong, địa chỉ web là `https://<tên-tài-khoản>.github.io/<tên-repo>/`. Mở lên, đăng nhập bằng tài khoản ở Bước 2.
+   - Trên điện thoại: mở địa chỉ đó bằng Chrome → menu ⋮ → **Cài đặt ứng dụng / Thêm vào màn hình chính** để dùng như app.
+
+**Cách khác để điền cấu hình:** thay vì sửa `config.js` trong git, vào repo → **Settings → Secrets and variables → Actions → Variables** → tạo hai biến `SUPABASE_URL` và `SUPABASE_ANON_KEY`. Workflow sẽ ghi đè `config.js` lúc build.
+
+## Bước 6. Nhập dữ liệu từ file Excel cũ
+
+Việc này chạy trên máy bạn; dữ liệu không đi đâu ngoài file riêng tư trong `private/`.
+
+1. Mở PowerShell trong thư mục dự án:
+
+   ```powershell
+   npm install
+   npm run import:xlsx -- "D:\đường\dẫn\QUAN_LY_TAI_CHINH_2026.xlsx"
+   ```
+
+2. Công cụ in **báo cáo đối chiếu** (cũng lưu ở `private/import-report.txt`): với mỗi thẻ, khoản nợ và lệnh đổi tiền, số tính lại từ giao dịch được so với số trong sheet cũ. Mọi dòng phải là ✓. Phần "CẦN XEM LẠI" liệt kê những chỗ công cụ đã phải đoán.
+3. Công cụ **không đọc** tab `password_incen`, và không nhập các tab đã bỏ (`VKA_2`, `usdt`, `vnd`, hai sổ công nợ ăn chung).
+4. Mở app (đã đăng nhập) → **Cài đặt → Dữ liệu → Nhập từ file** → chọn `private/import.json` → **Thay toàn bộ**.
+   - "Thay toàn bộ" xóa dữ liệu hiện có trong tài khoản rồi nạp dữ liệu từ file. Dùng cho lần nhập đầu.
+5. Xem **Tổng quan**: tổng tài sản bằng số cũ **trừ phần công nợ của hai sổ ăn chung không nhập** (báo cáo nhập có ghi rõ số đã trừ).
+6. Mở mục **Báo tỉ giá**: các lệnh đổi tiền cũ đã vào ở trạng thái *đã chốt*, app hỏi bạn có muốn **cộng bù lãi của chúng vào thẻ MB** hay **bỏ qua**.
+
+## Bước 7. Dựng APK cho Android
+
+1. Repo → **Actions → Dựng APK Android → Run workflow**. Chờ khoảng 6–12 phút.
+2. Khi xong, mở lần chạy đó → cuộn xuống **Artifacts** → tải `quan-ly-tai-chinh-apk` (file .zip) → giải nén được `app-debug.apk`.
+3. Chép file sang điện thoại (cáp, Zalo/Telegram "Saved Messages", Google Drive…). Mở file; Android sẽ hỏi cho phép **cài ứng dụng từ nguồn không rõ** cho ứng dụng bạn dùng để mở file → cho phép → **Cài đặt**.
+4. Mở app, đăng nhập một lần; sau đó app giữ phiên đăng nhập.
+
+Đây là bản **debug** (đủ dùng cho cá nhân, không đưa lên Google Play).
+
+**Cài bản mới đè bản cũ:** mỗi lần dựng, GitHub tạo một chữ ký khác nhau, nên Android sẽ không cho cài đè. Cách đơn giản: gỡ app cũ rồi cài bản mới (dữ liệu nằm trên Supabase nên không mất gì, chỉ phải đăng nhập lại). Muốn cài đè được: tạo một khóa ký cố định một lần theo hướng dẫn trong chú thích của `.github/workflows/android.yml` rồi lưu vào secret `DEBUG_KEYSTORE_BASE64`.
+
+---
+
+## Dùng hằng ngày
+
+- **Thêm nhanh:** ô "Nhập nhanh" ở Tổng quan, ví dụ `cafe 25k, ăn trưa 45k; +lương 10tr`. App tách từng khoản, tự đoán danh mục và cho bạn xem lại trước khi lưu.
+- **Báo tỉ giá (khách đổi RUB↔VND):** nhập giá và số tiền khách đưa → app tính giá báo, số tiền phải trả và lãi dự kiến.
+  - Khách chỉ hỏi giá: bấm **Lưu báo giá** — chưa tính lãi, số dư không đổi (lệnh nằm ở "Chờ chốt").
+  - Giao dịch thật sự xảy ra: bấm **✓ Chốt giao dịch** (hoặc nút *Chốt* ở lệnh đã lưu), điền giá thực tế nếu có → app ghi **một khoản thu = lãi vào thẻ MB đúng ngày giao dịch**. Hủy chốt hoặc xóa lệnh thì khoản lãi tự gỡ.
+  - Thẻ nhận lãi và các tham số (cỡ lô, lãi mặc định) chỉnh ở **Cài đặt**.
+- **Chuyển tiền / đổi tiền** giữa tài khoản (kể cả khác loại tiền) ở nút **Chuyển / đổi**: ghi số tiền ra và số tiền vào, app tự tính tỷ giá thực tế.
+- **Khớp số dư:** ở **Tài khoản**, bấm "Khớp số dư" khi số trong ngân hàng khác số trong app; app tạo một dòng điều chỉnh có ghi chú thay vì sửa lịch sử.
+- **Sao lưu:** **Cài đặt → Dữ liệu → Xuất sao lưu** (file JSON) thỉnh thoảng một lần. File này chứa dữ liệu thật, đừng đưa vào git.
+
+## Khi cập nhật mã
+
+Sửa file → GitHub Desktop commit và push → workflow Pages tự chạy lại. App web dùng chiến lược "mạng trước", nên mở lại là có bản mới. APK thì bấm chạy lại workflow Android khi có thay đổi lớn (mã web được đóng gói bên trong APK).
+
+## Gặp sự cố
+
+| Triệu chứng | Nguyên nhân thường gặp |
+|---|---|
+| Banner "Chế độ thử" hiện ở app thật | `config.js` còn trống hoặc sai; kiểm tra Project URL và khóa |
+| "Sai email hoặc mật khẩu" | Chưa tick *Auto Confirm User* khi tạo user, hoặc gõ sai; vào Authentication → Users để đặt lại |
+| Đăng nhập được nhưng không thấy dữ liệu / lỗi khi lưu | Chưa chạy `schema.sql` hoặc chạy lỗi giữa chừng; chạy lại (an toàn khi chạy nhiều lần) |
+| Web Pages trắng trơn | Mở Console (F12) xem lỗi; thường do `config.js` sai cú pháp |
+| Workflow Pages báo lỗi "Pages not enabled" | Chưa đặt Source = GitHub Actions ở Settings → Pages |
+| Dự án Supabase "paused" | Gói miễn phí có thể tạm dừng dự án khi lâu không hoạt động; vào dashboard bấm **Restore** (dữ liệu vẫn còn) |
