@@ -1,4 +1,10 @@
-import { h, money, chip, donut, barPairs, progress, fmtPct, emptyState, toast, errMsg } from '../ui.js';
+import { h, svg, money, chip, donut, barPairs, progress, fmtPct, emptyState, toast, errMsg } from '../ui.js';
+
+/** Con mắt đơn giản: đang hiện số = mắt mở; đang ẩn = mắt có gạch chéo. */
+const eyeIcon = (slashed) => svg('svg', { viewBox: '0 0 24 24', width: 22, height: 22, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.9, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
+  svg('path', { d: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z' }),
+  svg('circle', { cx: 12, cy: 12, r: 3 }),
+  slashed ? svg('path', { d: 'M4 4l16 16' }) : null);
 import { store } from '../store.js';
 import { overview, periodStats, monthlySeries, budgetStatus } from '../calc.js';
 import { statusOf, dealProfit } from '../deals.js';
@@ -15,7 +21,7 @@ export function render(root) {
   const txs = store.all('txs');
   const month = todayStr().slice(0, 7);
 
-  const eye = h('button', { class: 'icon-btn', 'aria-label': 'Ẩn hiện số dư', title: 'Ẩn / hiện số dư', onclick: () => store.saveSettings({ hideAmounts: !s.hideAmounts }) }, s.hideAmounts ? '🙈' : '👁️');
+  const eye = h('button', { class: 'icon-btn', type: 'button', 'aria-label': s.hideAmounts ? 'Hiện số dư' : 'Ẩn số dư', 'aria-pressed': s.hideAmounts ? 'true' : 'false', title: s.hideAmounts ? 'Hiện số dư' : 'Ẩn số dư', onclick: () => store.saveSettings({ hideAmounts: !s.hideAmounts }) }, eyeIcon(!!s.hideAmounts));
   root.append(pageHead('Tổng quan', eye));
 
   const qaInput = h('input', { type: 'text', placeholder: 'Nhập nhanh: cafe 25k, ăn trưa 45k, +lương 10tr…', 'aria-label': 'Nhập nhanh' });
@@ -78,8 +84,7 @@ export function render(root) {
   // 6 tháng
   const series = monthlySeries(txs, month, 6, rates);
   root.append(card('6 tháng gần nhất', h('div', {},
-    barPairs(series.map((x) => ({ label: `T${Number(x.month.slice(5))}`, a: x.income, b: x.expense }))),
-    h('div', { class: 'legend-inline' }, h('span', {}, h('i', { style: { background: 'var(--mint)' } }), 'Thu'), h('span', {}, h('i', { style: { background: 'var(--rose)' } }), 'Chi')))));
+    barPairs(series.map((x) => ({ label: `T${Number(x.month.slice(5))}`, title: monthLabel(x.month), a: x.income, b: x.expense })), { cur: s.baseCurrency }))));
 
   // Công nợ
   const debtRows = [...ov.debts.entries()].map(([pid, o]) => ({ party: store.byId('parties', pid), o }))

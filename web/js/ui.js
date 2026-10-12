@@ -191,23 +191,85 @@ export function donut(data, { size = 168, thickness = 26 } = {}) {
   return root;
 }
 
-/** Cột ghép thu/chi theo tháng. series: [{label, a (thu), b (chi)}] */
-export function barPairs(series, { height = 150 } = {}) {
-  const W = 320;
-  const pad = { l: 4, r: 4, t: 8, b: 22 };
-  const max = Math.max(1, ...series.flatMap((s) => [s.a, s.b]));
-  const slot = (W - pad.l - pad.r) / series.length;
-  const bw = Math.min(16, slot / 2.6);
-  const root = svg('svg', { viewBox: `0 0 ${W} ${height}`, class: 'bars', role: 'img', preserveAspectRatio: 'none' });
-  series.forEach((s, i) => {
-    const x0 = pad.l + i * slot + slot / 2;
-    const ph = height - pad.t - pad.b;
-    const ha = (s.a / max) * ph;
-    const hb = (s.b / max) * ph;
-    root.append(svg('rect', { x: x0 - bw - 1, y: pad.t + ph - ha, width: bw, height: Math.max(ha, 0), rx: 4, fill: 'var(--mint)' }));
-    root.append(svg('rect', { x: x0 + 1, y: pad.t + ph - hb, width: bw, height: Math.max(hb, 0), rx: 4, fill: 'var(--rose)' }));
-    root.append(svg('text', { x: x0, y: height - 6, 'text-anchor': 'middle', class: 'axis' }, s.label));
+/** Cột ghép thu/chi theo tháng. series: [{label, title, a (thu), b (chi)}], cũ → mới. Vẽ bằng HTML/CSS nên không méo theo bề ngang. */
+const niceTop = (max) => {
+  let pow = 10 ** Math.floor(Math.log10(max));
+  if (pow * 10 <= max) pow *= 10;
+  return [1, 2, 3, 4, 6, 8, 10].find((k) => k * pow >= max) * pow; // nửa trục luôn là số tròn
+};
+const trim1 = (n) => String(Math.round(n * 10) / 10).replace('.', ',');
+function tickLabel(v, cur) {
+  if (v === 0) return '0';
+  if (cur === 'VND') {
+    if (v >= 1e9) return `${trim1(v / 1e9)} tỷ`;
+    if (v >= 1e6) return `${trim1(v / 1e6)} tr`;
+    if (v >= 1e3) return `${trim1(v / 1e3)}k`;
+    return String(v);
+  }
+  if (v >= 1e6) return `${trim1(v / 1e6)}M`;
+  if (v >= 1e3) return `${trim1(v / 1e3)}k`;
+  return trim1(v);
+}
+
+export function barPairs(series, { cur = 'VND' } = {}) {
+  const hidden = !!store.settings().hideAmounts;
+  const max = Math.max(0, ...series.flatMap((s) => [s.a, s.b]));
+  const top = max > 0 ? niceTop(max) : 1;
+  const fmt = (v) => (hidden ? '•••••' : fmtMoney(v, cur));
+  const fmtNet = (v) => (hidden ? '•••••' : `${v > 0 ? '+' : ''}${fmtMoney(v, cur)}`);
+  const pct = (v) => (v > 0 ? `${Math.max((v / top) * 100, 1.2)}%` : '0');
+
+  const root = h('div', { class: 'bchart' });
+  const tip = h('div', { class: 'bchart-tip', role: 'status', hidden: true });
+  const plot = h('div', { class: 'bchart-plot' });
+  plot.append(h('div', { class: 'bchart-grid', 'aria-hidden': 'true' },
+    [0, 0.5, 1].map((f) => h('span', { style: { bottom: `${f * 100}%` } }, h('em', {}, hidden ? '' : tickLabel(top * f, cur))))));
+
+  const cols = h('div', { class: 'bchart-cols' });
+  const row = (cls, label, value) => h('div', { class: 'tip-row' }, h('i', { class: cls }), h('span', {}, label), h('b', {}, value));
+  const hideTip = () => { tip.hidden = true; };
+  series.forEach((s) => {
+    const col = h('button', { type: 'button', class: 'bchart-col', 'aria-label': `${s.title}: thu ${fmt(s.a)}, chi ${fmt(s.b)}` },
+      h('i', { class: 'bar in', style: { height: pct(s.a) } }),
+      h('i', { class: 'bar out', style: { height: pct(s.b) } }));
+    const show = () => {
+      const net = s.a - s.b;
+      tip.replaceChildren(
+        h('div', { class: 'tip-title' }, s.title || s.label),
+        row('in', 'Thu', fmt(s.a)),
+        row('out', 'Chi', fmt(s.b)),
+        h('div', { class: 'tip-net' }, h('span', {}, 'Còn lại'), h('b', { class: net < 0 ? 'neg' : 'pos' }, fmtNet(net))));
+      tip.hidden = false;
+      const rr = root.getBoundingClientRect();
+      const rc = col.getBoundingClientRect();
+      const rp = plot.getBoundingClientRect();
+      // Đặt hộp số liệu cạnh cột đang chỉ (bên phải, hết chỗ thì sang trái) để không che chính cột đó.
+      const w = tip.offsetWidth;
+      const colL = rc.left - rr.left;
+      let left = colL + rc.width + 6;
+      if (left + w > rr.width) left = colL - w - 6;
+      tip.style.left = `${Math.max(0, Math.min(left, rr.width - w))}px`;
+      const barTop = rp.top - rr.top + rp.height * (1 - Math.max(s.a, s.b) / top);
+      const maxTop = rp.top - rr.top + rp.height - tip.offsetHeight;
+      tip.style.top = `${Math.max(0, Math.min(barTop - 8, maxTop))}px`;
+    };
+    col.addEventListener('pointerenter', show);
+    col.addEventListener('focus', show);
+    col.addEventListener('pointerleave', hideTip);
+    col.addEventListener('blur', hideTip);
+    cols.append(col);
   });
+  plot.append(cols);
+
+  const xs = h('div', { class: 'bchart-x', 'aria-hidden': 'true' }, series.map((s, i) => h('span', { class: i === series.length - 1 ? 'now' : '' }, s.label)));
+  const legend = h('div', { class: 'legend-inline' }, h('span', {}, h('i', { class: 'in' }), 'Thu'), h('span', {}, h('i', { class: 'out' }), 'Chi'));
+  const table = h('details', { class: 'bchart-table' },
+    h('summary', {}, 'Xem dạng bảng'),
+    h('table', {},
+      h('thead', {}, h('tr', {}, h('th', {}, 'Tháng'), h('th', {}, 'Thu'), h('th', {}, 'Chi'), h('th', {}, 'Còn lại'))),
+      h('tbody', {}, [...series].reverse().map((s) => h('tr', {}, h('td', {}, s.title || s.label), h('td', {}, fmt(s.a)), h('td', {}, fmt(s.b)), h('td', {}, fmtNet(s.a - s.b)))))));
+
+  root.append(plot, xs, legend, table, tip);
   return root;
 }
 
