@@ -66,10 +66,10 @@ Tất cả lưu trong một bảng `records(collection, data jsonb)` trên Supab
 | `accounts` | `name`, `kind` (tiền mặt, ngân hàng, thẻ, tiết kiệm, ví, crypto), `currency`, `opening`, `networth` (có tính vào tài sản không), `archived` |
 | `parties` | `name`, `role` (người quen vay mượn / khách đổi tiền / người nhà), `note` |
 | `categories` | `name`, `type` (thu/chi), `icon` |
-| `txs` | `date`, `kind`, `amount`, `currency`, `accountId`, `toAccountId`, `toAmount`, `partyId`, `categoryId`, `note`, `dealId` (chỉ có ở khoản lãi tự cộng khi chốt giao dịch) |
+| `txs` | `date`, `kind`, `amount`, `currency`, `accountId`, `toAccountId`, `toAmount`, `partyId`, `categoryId`, `note`, `dealId` (chỉ có ở khoản lãi tự cộng khi chốt giao dịch), `scholarshipId` (chỉ có ở khoản học bổng tự cộng khi đánh dấu đã nhận) |
 | `deals` | Lệnh đổi tiền: `dir` (`sang`/`ve`), `status` (`quote` báo giá / `done` đã chốt), `date`, `partyId`, `inputs`, `actual`, `profit` (VND, chỉ khi đã chốt), `profitTxId` (giao dịch lãi đã cộng vào thẻ), `postSkipped` |
 | `dorm` | `paidDate`, `amount`, `payer`, `period`, `receiptSent` |
-| `scholarships` | `month`, `availableDate`, `receivedDate`, `amount` |
+| `scholarships` | Mục «Học bổng MIIGAiK»: `month`, `availableDate`, `receivedDate` (có = đã nhận), `amount` (₽), `currency` (`RUB`), `txId` (khoản thu đã cộng vào thẻ) |
 | `budgets` | `categoryId`, `amount`, `currency` (ngân sách theo tháng) |
 | `settings` | tiền tệ gốc, tỷ giá, tham số nghiệp vụ, tùy chọn giao diện |
 
@@ -117,6 +117,20 @@ Nhiều khách chỉ hỏi giá rồi không giao dịch, nên **báo giá khôn
 - Khoản lãi trong sổ gắn với lệnh qua `dealId`/`profitTxId`: **sửa** lệnh thì khoản lãi tự cập nhật, **hủy chốt** hoặc **xóa** lệnh thì khoản lãi tự biến mất, số dư luôn khớp. Khoản này không sửa tay ở màn hình Giao dịch (app dẫn bạn về lệnh gốc).
 - Thẻ nhận lãi chọn trong Cài đặt; để trống thì app mặc định thẻ VND có tên chứa "MB", hoặc cho chọn mỗi lần chốt. Có thể bỏ tick "Cộng lãi vào thẻ" cho từng lệnh.
 - Các lệnh cũ nhập từ sheet được đánh dấu **đã chốt nhưng chưa cộng vào thẻ** (số dư MB trong sheet cũ chưa từng có các khoản này). App hiện một thông báo để bạn chọn **cộng bù** (mỗi lệnh một khoản thu đúng ngày) hoặc **bỏ qua**.
+
+### Học bổng MIIGAiK → cộng vào thẻ ₽
+
+Mỗi tháng một dòng, mặc định **15.000 ₽** (đổi được trong Cài đặt). Cũng như báo giá, **chưa nhận thì không đụng số dư**:
+
+| Trạng thái | Ảnh hưởng số dư |
+|---|---|
+| Chưa tick «Đã nhận» | Không |
+| Đã nhận + chọn thẻ (Gazprom hoặc PSPB… — mọi thẻ ₽ trừ sổ tiết kiệm) | Ghi **một khoản thu ₽** vào thẻ đó, đúng **ngày thực nhận**; số dư thẻ tăng đúng số tiền |
+| Đã nhận + «Không cộng vào thẻ nào» | Không (dành cho tháng cũ mà số dư thẻ đã tính sẵn) |
+
+- Khoản thu gắn với tháng qua `scholarshipId`/`txId`: **đổi** số tiền, ngày hoặc thẻ thì khoản tự cập nhật; **bỏ tick «Đã nhận»** hoặc **xóa tháng** thì khoản tự biến mất. Khoản này không sửa tay ở màn hình Giao dịch (app dẫn về tháng gốc) — nên đừng thêm lại học bổng ở mục Giao dịch, sẽ bị tính hai lần.
+- Thẻ chọn sẵn là thẻ bạn chọn lần trước; lần đầu là thẻ có tên chứa "Gazprom", rồi "PSPB". Cài đặt có ô chọn thẻ mặc định.
+- 14 tháng nhập từ sheet cũ giữ nguyên, **không** có khoản cộng nào (số dư thẻ trong sheet cũ đã khớp). Khi mở một tháng cũ chưa nhận mà tick «Đã nhận», thẻ được chọn sẵn như tháng mới.
 
 ## 6. Ánh xạ từ sheet cũ
 

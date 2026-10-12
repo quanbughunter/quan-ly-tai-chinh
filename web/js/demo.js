@@ -51,7 +51,6 @@ export async function seedDemo() {
   txs.push({ date: addDays(today, -35), kind: 'lend', amount: 12_000, currency: 'RUB', partyId: chi.id, note: 'Cho em mượn (không gắn tài khoản)' });
   txs.push({ date: addDays(today, -12), kind: 'borrow', amount: 3_000_000, currency: 'VND', accountId: cash.id, partyId: binh.id, note: 'Vay tạm' });
   txs.push({ date: addDays(today, -25), kind: 'transfer', amount: 6_000_000, currency: 'VND', accountId: main.id, toAccountId: rub.id, toAmount: 19_800, note: 'Đổi sang rúp' });
-  txs.push({ date: addDays(today, -18), kind: 'income', amount: 15_000, currency: 'RUB', accountId: rub.id, categoryId: cat('Học bổng'), note: 'Học bổng' });
   txs.push({ date: addDays(today, -10), kind: 'expense', amount: 1_850, currency: 'RUB', accountId: rub.id, categoryId: cat('Ăn uống'), note: 'siêu thị' });
   txs.push({ date: addDays(today, -40), kind: 'transfer', amount: 100, currency: 'USDT', accountId: usdt.id, toAccountId: save.id, toAmount: 2_650_000, note: 'Bán USDT lấy VND' });
   await mk('txs', txs.map((t, i) => ({ ...t, ts: 1000 + i })));
@@ -81,10 +80,16 @@ export async function seedDemo() {
     { paidDate: addDays(today, -9), amount: 2400, currency: 'RUB', payer: 'Tài khoản mẫu 1', period: 'Tháng 10', receiptSent: false },
   ]);
 
-  await mk('scholarships', [
-    { month: addDays(today, -120).slice(0, 7), availableDate: addDays(today, -95), receivedDate: addDays(today, -92) },
-    { month: addDays(today, -90).slice(0, 7), availableDate: addDays(today, -62), receivedDate: addDays(today, -52) },
-    { month: addDays(today, -60).slice(0, 7), availableDate: addDays(today, -32), receivedDate: addDays(today, -31) },
-    { month: addDays(today, -30).slice(0, 7), availableDate: addDays(today, -3) },
+  // Học bổng MIIGAiK: 3 tháng đã nhận (cộng vào thẻ ₽ chính, mỗi tháng một khoản thu) + 1 tháng đang chờ.
+  const schol = await mk('scholarships', [
+    { month: addDays(today, -90).slice(0, 7), currency: 'RUB', amount: 15_000, availableDate: addDays(today, -62), receivedDate: addDays(today, -52) },
+    { month: addDays(today, -60).slice(0, 7), currency: 'RUB', amount: 15_000, availableDate: addDays(today, -32), receivedDate: addDays(today, -31) },
+    { month: addDays(today, -30).slice(0, 7), currency: 'RUB', amount: 15_000, availableDate: addDays(today, -4), receivedDate: addDays(today, -2) },
+    { month: today.slice(0, 7), currency: 'RUB', amount: 15_000, availableDate: addDays(today, -1) },
   ]);
+  const schTxs = await mk('txs', schol.filter((x) => x.receivedDate).map((x, i) => ({
+    date: x.receivedDate, kind: 'income', amount: x.amount, currency: 'RUB', accountId: rub.id, categoryId: cat('Học bổng'),
+    note: `Học bổng MIIGAiK · Tháng ${Number(x.month.slice(5))}/${x.month.slice(0, 4)}`, scholarshipId: x.id, ts: 6000 + i,
+  })));
+  await mk('scholarships', schol.filter((x) => x.receivedDate).map((x, i) => ({ ...x, txId: schTxs[i].id })));
 }

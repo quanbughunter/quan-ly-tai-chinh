@@ -1,6 +1,6 @@
 # Quản lý tài chính
 
-Sổ thu chi, tài khoản nhiều loại tiền, công nợ, **Báo tỉ giá** RUB↔VND (báo giá → chốt giao dịch → tự cộng lãi vào thẻ MB), KTX và học bổng — thay cho file Google Sheet cũ.
+Sổ thu chi, tài khoản nhiều loại tiền, công nợ, **Báo tỉ giá** RUB↔VND (báo giá → chốt giao dịch → tự cộng lãi vào thẻ MB), KTX và **Học bổng MIIGAiK** (tick “đã nhận” + chọn thẻ ₽ → tự cộng 15.000 ₽ vào số dư thẻ) — thay cho file Google Sheet cũ.
 
 - **Web** (GitHub Pages) và **APK Android** (Capacitor) dùng chung một mã nguồn trong `web/`: HTML + JavaScript thuần, **không cần bước build**.
 - **Dữ liệu** nằm trên Supabase, sau đăng nhập bằng email + mật khẩu; bảo vệ bằng Row Level Security. Repo công khai chỉ chứa mã nguồn.

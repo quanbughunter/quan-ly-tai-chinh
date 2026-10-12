@@ -60,6 +60,8 @@ export const DEFAULT_SETTINGS = {
     defaultMarginSang: 90000, // VND lãi mong muốn trên mỗi lô
     defaultMarginVe: 90000,
     dealAccountId: '', // tài khoản (thẻ MB) nhận lãi khi chốt giao dịch đổi tiền; để trống = hỏi lúc chốt
+    scholarshipAmount: 15000, // RUB: học bổng MIIGAiK mỗi tháng
+    scholarshipAccountId: '', // thẻ ₽ nhận học bổng lần gần nhất (tự nhớ); để trống = Gazprom → PSPB → thẻ ₽ đầu tiên
   },
   hideAmounts: false,
 };

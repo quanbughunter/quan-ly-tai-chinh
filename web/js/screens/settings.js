@@ -71,6 +71,12 @@ export function render(root) {
     field('Thẻ nhận lãi khi chốt giao dịch', select(accountOptions({ none: '— Hỏi mỗi lần chốt —', only: (a) => a.currency === 'VND' }), P.dealAccountId, (v) => save(() => store.saveSettings({ params: { dealAccountId: v } }))),
       'Khi bạn bấm “Chốt giao dịch” ở mục Báo tỉ giá, lãi thực được cộng vào thẻ này, đúng ngày của lệnh. Báo giá mà chưa chốt thì không cộng gì.'))));
 
+  /* ── Học bổng MIIGAiK ── */
+  root.append(card('Học bổng MIIGAiK', h('div', { class: 'form' },
+    numRow('Số tiền mỗi tháng (₽)', P.scholarshipAmount, setP('scholarshipAmount'), { cur: 'RUB', hint: 'Điền sẵn khi thêm tháng mới ở mục Học bổng MIIGAiK.' }),
+    field('Thẻ nhận học bổng chọn sẵn', select(accountOptions({ none: '— Tự chọn: Gazprom, rồi PSPB —', only: (a) => a.currency === 'RUB' && a.kind !== 'savings' }), P.scholarshipAccountId, (v) => save(() => store.saveSettings({ params: { scholarshipAccountId: v } }))),
+      'Khi bạn tick “Đã nhận” ở một tháng học bổng, số tiền được cộng vào thẻ chọn ở đó. App nhớ thẻ bạn chọn lần gần nhất.'))));
+
   /* ── Danh mục ── */
   root.append(categoriesCard());
 
@@ -211,7 +217,7 @@ async function openImport() {
 
 const LABELS = {
   accounts: 'Tài khoản', parties: 'Người/đối tượng', categories: 'Danh mục', txs: 'Giao dịch', deals: 'Lệnh đổi tiền',
-  dorm: 'KTX', scholarships: 'Học bổng', budgets: 'Ngân sách', settings: 'Cài đặt',
+  dorm: 'KTX', scholarships: 'Học bổng MIIGAiK', budgets: 'Ngân sách', settings: 'Cài đặt',
 };
 
 function openWipe() {

@@ -4,4 +4,5 @@ import './money.test.js';
 import './calc.test.js';
 import './fx.test.js';
 import './deals.test.js';
+import './scholarship.test.js';
 import './quickadd.test.js';

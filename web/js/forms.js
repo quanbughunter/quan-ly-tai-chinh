@@ -8,6 +8,7 @@ import { accountBalances, DEBT_SIGN } from './calc.js';
 import { parseQuick } from './quickadd.js';
 import { fmtMoney, fmtNum } from './money.js';
 import { requestOpenDeal } from './deals.js';
+import { requestOpenScholarship, SCHOLARSHIP_NAME } from './scholarship.js';
 
 const DEBT_KINDS = ['lend', 'repay_in', 'borrow', 'repay_out'];
 
@@ -52,6 +53,7 @@ const groupOf = (kind) => (DEBT_KINDS.includes(kind) ? 'debt' : kind || 'expense
 export function openTxForm(init = {}) {
   const t = init.tx || null;
   if (t && t.dealId) return openDealTxNotice(t);
+  if (t && t.scholarshipId) return openScholarshipTxNotice(t);
   if (!store.all('accounts').length) {
     toast('Hãy tạo ít nhất một tài khoản trước.', 'error');
     location.hash = '#/accounts';
@@ -195,6 +197,23 @@ function openDealTxNotice(t) {
     actions: [
       h('button', { class: 'btn ghost', type: 'button', onclick: () => m.close() }, 'Đóng'),
       deal ? h('button', { class: 'btn primary', type: 'button', onclick: () => { m.close(); requestOpenDeal(deal.id); location.hash = '#/fx'; } }, 'Mở lệnh đổi tiền') : null,
+    ].filter(Boolean),
+  });
+  return m;
+}
+
+/** Khoản học bổng do mục Học bổng MIIGAiK tự tạo: sửa ở đó để số dư thẻ luôn khớp. */
+function openScholarshipTxNotice(t) {
+  const item = store.byId('scholarships', t.scholarshipId);
+  const a = accById(t.accountId);
+  const body = h('div', { class: 'form' },
+    h('p', { class: 'confirm-text' }, `Khoản này (${fmtMoney(t.amount, t.currency)}${a ? ` · ${a.name}` : ''}) được tạo tự động khi bạn đánh dấu đã nhận học bổng ở mục ${SCHOLARSHIP_NAME}. Muốn sửa số tiền, đổi ngày, đổi thẻ hoặc hủy, hãy mở tháng đó — khoản này sẽ tự cập nhật theo.`));
+  const m = modal({
+    title: SCHOLARSHIP_NAME,
+    body,
+    actions: [
+      h('button', { class: 'btn ghost', type: 'button', onclick: () => m.close() }, 'Đóng'),
+      item ? h('button', { class: 'btn primary', type: 'button', onclick: () => { m.close(); requestOpenScholarship(item.id); location.hash = '#/scholarship'; } }, 'Mở tháng học bổng') : null,
     ].filter(Boolean),
   });
   return m;

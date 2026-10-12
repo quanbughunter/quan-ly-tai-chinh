@@ -21,7 +21,7 @@ const ROUTES = {
   debts: { title: 'Vay nợ', icon: 'users', mod: debts },
   fx: { title: 'Báo tỉ giá', icon: 'swap', mod: exchange },
   dorm: { title: 'Tiền KTX', icon: 'building', mod: dorm },
-  scholarship: { title: 'Học bổng', icon: 'cap', mod: scholarship },
+  scholarship: { title: 'Học bổng MIIGAiK', icon: 'cap', mod: scholarship },
   settings: { title: 'Cài đặt', icon: 'sliders', mod: settings },
 };
 const SIDE_ORDER = ['home', 'tx', 'accounts', 'debts', 'fx', 'dorm', 'scholarship', 'settings'];
