@@ -397,6 +397,31 @@ a.row:hover, button.row:hover { background: var(--surface-2); text-decoration: n
 .qa-row > select { flex: 0 1 160px; width: auto; padding: 7px 10px; font-size: 14px; }
 .qa-row.bad { border-color: var(--rose); background: var(--rose-soft); }
 
+/* Khoản nhập nhanh có thể chia cho người trong Vay nợ */
+.qa-item { border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); overflow: hidden; }
+.qa-item > .qa-row { border: 0; border-radius: 0; background: transparent; }
+.qa-item.bad { border-color: var(--rose); background: var(--rose-soft); }
+.qa-share-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 0 10px 8px; }
+.qa-share-bar .seg { flex: 0 1 280px; margin-bottom: 0; }
+.qa-share-bar .seg-btn { padding: 5px 8px; font-size: 13px; }
+.qa-share { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-top: 1px dashed var(--line); background: var(--surface); }
+.qa-people { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pick { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); font-size: 14px; cursor: pointer; }
+.pick input { width: 16px; height: 16px; accent-color: var(--primary); }
+.pick.on { border-color: var(--primary); background: var(--primary-soft); font-weight: 650; }
+.qa-addp { cursor: pointer; border: 1px dashed var(--line); font: inherit; font-size: 13px; }
+.qa-amounts { display: flex; flex-direction: column; gap: 6px; }
+.qa-amt { display: grid; grid-template-columns: 1fr minmax(110px, 42%) auto; gap: 8px; align-items: center; }
+.qa-who { display: flex; flex-direction: column; min-width: 0; }
+.qa-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qa-amt input { text-align: right; padding: 7px 10px; font-variant-numeric: tabular-nums; }
+.qa-amt input.auto { color: var(--muted); }
+.qa-amt input.bad { border-color: var(--rose); background: var(--rose-soft); }
+.qa-cur { color: var(--muted); font-size: 13px; min-width: 1.2em; }
+.qa-sum { margin: 0; padding: 8px 10px; border-radius: 12px; background: var(--primary-soft); color: var(--text); font-size: 13px; }
+.qa-sum.bad { background: var(--rose-soft); color: var(--rose-ink); }
+.qa-share-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
 /* ───────── Hộp thoại ───────── */
 .overlay {
   position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center;

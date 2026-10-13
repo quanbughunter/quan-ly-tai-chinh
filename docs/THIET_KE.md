@@ -132,6 +132,20 @@ Mỗi tháng một dòng, mặc định **15.000 ₽** (đổi được trong C�
 - Thẻ chọn sẵn là thẻ bạn chọn lần trước; lần đầu là thẻ có tên chứa "Gazprom", rồi "PSPB". Cài đặt có ô chọn thẻ mặc định.
 - 14 tháng nhập từ sheet cũ giữ nguyên, **không** có khoản cộng nào (số dư thẻ trong sheet cũ đã khớp). Khi mở một tháng cũ chưa nhận mà tick «Đã nhận», thẻ được chọn sẵn như tháng mới.
 
+### Nhập nhanh ↔ Vay nợ (mình là thủ quỹ mua đồ ăn cho nhiều người)
+
+Mỗi khoản trong «Nhập nhanh» có thanh **Chia cho người trong Vay nợ**: `Không chia` (như cũ) · `Cộng nợ` · `Trừ nợ`. Chọn người bằng ô tick (danh sách đúng như màn hình Vay nợ), hoặc «＋ Thêm người» ngay trong hộp thoại.
+
+| Chế độ | Ý nghĩa | Ghi vào sổ |
+|---|---|---|
+| **Cộng nợ** | Mình trả hộ cả khoản | Tài khoản **trừ đủ** số tiền. Mỗi người được chọn một giao dịch **Cho vay** (`lend`, họ nợ mình thêm phần của họ). Nếu tick «Tính cả phần của mình» (mặc định) thì phần của mình là một khoản **chi** bình thường, có danh mục |
+| **Trừ nợ** | Họ đưa tiền cho mình | Tài khoản **cộng** số tiền. Mỗi người một giao dịch **Thu nợ** (`repay_in`, nợ giảm). Không tạo khoản thu nhập nào |
+
+- Mặc định **chia đều** (mình + những người được chọn). Sửa tay phần của một người thì người còn lại (và mình) chia đều số dư. Tổng các phần **luôn khớp đúng số tiền**: tính theo đơn vị nhỏ nhất (VND 1 đồng, ₽ 0,01), số lẻ do **người trả gánh** nên không ai bị tính dư.
+- Mỗi người hiện «đang nợ mình / mình đang nợ / hiện chưa nợ» (theo tiền tệ của khoản) và dòng tóm tắt tác động lên tài khoản trước khi lưu. Phần chia sai (không chọn ai, vượt tổng, thiếu) hiện màu đỏ và **không được lưu**.
+- Nhớ người và lựa chọn «Tính cả phần của mình» của lần trước; nút «Dùng cho tất cả khoản» áp cùng cách chia cho mọi khoản đang nhập. Mỗi giao dịch tạo ra là giao dịch thường (không liên kết với nhau), sửa/xóa riêng ở Giao dịch hoặc trong trang của người đó ở Vay nợ.
+- Logic chia nằm ở `web/js/share.js` (hàm thuần, kiểm thử trong `tests/share.test.js`).
+
 ## 6. Ánh xạ từ sheet cũ
 
 | Sheet cũ | Thành | Ghi chú |

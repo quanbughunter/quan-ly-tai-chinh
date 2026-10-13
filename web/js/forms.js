@@ -4,9 +4,10 @@ import { h, modal, field, select, seg, moneyInput, currencyOptions, toast, errMs
 import { store } from './store.js';
 import { TX_KINDS, ACCOUNT_KINDS, PARTY_ROLES } from './model.js';
 import { todayStr } from './dates.js';
-import { accountBalances, DEBT_SIGN } from './calc.js';
+import { accountBalances, debtBalances, DEBT_SIGN } from './calc.js';
 import { parseQuick } from './quickadd.js';
-import { fmtMoney, fmtNum } from './money.js';
+import { fmtMoney, fmtNum, parseExpr, CUR_INFO } from './money.js';
+import { planShare, buildShareTxs, describeShare } from './share.js';
 import { requestOpenDeal } from './deals.js';
 import { requestOpenScholarship, SCHOLARSHIP_NAME } from './scholarship.js';
 
@@ -220,6 +221,41 @@ function openScholarshipTxNotice(t) {
 }
 
 /* ───────────────────────── Nhập nhanh ───────────────────────── */
+// Mỗi khoản có thể gắn với người trong danh sách Vay nợ (mình là thủ quỹ mua đồ ăn cho nhiều người):
+//  • Cộng nợ — mình trả hộ: tài khoản bị trừ đủ, người được chọn nợ mình thêm phần của họ.
+//  • Trừ nợ  — họ đưa tiền cho mình: tài khoản được cộng, nợ của họ giảm.
+// Cách chia và dựng giao dịch nằm ở share.js (hàm thuần, có kiểm thử).
+const SHARE_PEOPLE_KEY = 'qltc:sharePeople';
+const SHARE_ME_KEY = 'qltc:shareIncludeMe';
+const SHARE_MODE_OPTS = [
+  { value: 'none', label: 'Không chia' },
+  { value: 'add', label: 'Cộng nợ' },
+  { value: 'sub', label: 'Trừ nợ' },
+];
+
+/** Những người có thể chọn: đúng như màn hình Vay nợ (người quen / người nhà, hoặc đang có nợ). */
+function sharePartyList() {
+  const debts = debtBalances(store.all('txs'));
+  return store.all('parties')
+    .filter((p) => (p.role || 'person') === 'person' || p.role === 'family' || debts.has(p.id))
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+}
+function lastSharePeople() {
+  try {
+    const v = JSON.parse(lsGet(SHARE_PEOPLE_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((id) => partyById(id)) : [];
+  } catch { return []; }
+}
+const newDebt = () => ({ mode: 'none', partyIds: [], includeMe: lsGet(SHARE_ME_KEY) !== '0', manual: {}, bad: {} });
+
+function planOf(it) {
+  const d = it.debt;
+  if (d.mode === 'none') return { ok: true, shares: {}, myShare: 0 };
+  if (Object.keys(d.bad).length) return { ok: false, error: 'Có ô số tiền chưa đọc được.', shares: {}, myShare: 0 };
+  return planShare({ mode: d.mode, amount: it.amount, currency: it.currency, partyIds: d.partyIds, includeMe: d.includeMe, manual: d.manual });
+}
+const itemOk = (it) => !it.error && !it.mismatch && planOf(it).ok;
+
 export function openQuickAdd(initialText = '') {
   if (!store.all('accounts').length) {
     toast('Hãy tạo ít nhất một tài khoản trước.', 'error');
@@ -231,9 +267,11 @@ export function openQuickAdd(initialText = '') {
   const list = h('div', { class: 'qa-list' });
   const info = h('p', { class: 'field-hint' });
   const catByName = (name, type) => store.all('categories').find((c) => c.type === type && c.name === name);
+  const nameOf = (id) => (partyById(id) || {}).name || '?';
 
   const body = h('div', { class: 'form' },
-    field('Gõ nhiều khoản, ngăn bằng dấu phẩy, chấm phẩy hoặc xuống dòng', ta, 'Thêm "+" ở đầu cho khoản thu. Gắn đơn vị: 12 usd, 300 rub.'),
+    field('Gõ nhiều khoản, ngăn bằng dấu phẩy, chấm phẩy hoặc xuống dòng', ta,
+      'Thêm "+" ở đầu cho khoản thu. Gắn đơn vị: 12 usd, 300 rub. Mua đồ ăn cho người khác: chọn “Cộng nợ” ở khoản đó.'),
     h('div', { class: 'grid2' },
       field('Tài khoản', select(accountOptions(), st.accountId, (v) => { st.accountId = v; parse(); })),
       field('Ngày', h('input', { type: 'date', value: st.date, onchange: (e) => { st.date = e.target.value; } }))),
@@ -245,43 +283,213 @@ export function openQuickAdd(initialText = '') {
   function parse() {
     const acc = accById(st.accountId);
     const parsed = parseQuick(ta.value, { defaultCurrency: acc ? acc.currency : 'VND' });
+    // Gõ thêm chữ thì các khoản cũ giữ nguyên lựa chọn (danh mục, ghi chú, người chia nợ).
+    const prev = new Map();
+    for (const it of st.items) if (!it.error) prev.set(it.raw, [...(prev.get(it.raw) || []), it]);
     st.items = parsed.map((p) => {
       if (p.error) return p;
+      const old = (prev.get(p.raw) || []).shift();
       const cat = p.categoryName ? catByName(p.categoryName, p.kind) : null;
-      return { ...p, categoryId: cat ? cat.id : '', mismatch: acc && p.currency !== acc.currency };
+      const debt = old ? old.debt : newDebt();
+      if (old && old.currency !== p.currency) { debt.manual = {}; debt.bad = {}; } // đổi tiền tệ → bỏ số nhập tay
+      return {
+        ...p,
+        note: old ? old.note : p.note,
+        categoryId: old ? old.categoryId : (cat ? cat.id : ''),
+        debt,
+        mismatch: acc && p.currency !== acc.currency,
+      };
     });
     drawList();
   }
 
-  function drawList() {
-    const ok = st.items.filter((i) => !i.error && !i.mismatch);
-    info.textContent = st.items.length ? `${ok.length}/${st.items.length} khoản hợp lệ` : '';
+  function refreshInfo() {
+    const ok = st.items.filter(itemOk);
+    const bad = st.items.length - ok.length;
+    info.textContent = st.items.length ? `${ok.length}/${st.items.length} khoản hợp lệ${bad ? ' — khoản màu đỏ sẽ không được lưu' : ''}` : '';
     saveBtn.disabled = !ok.length;
-    list.replaceChildren(...st.items.map((it, idx) => {
-      if (it.error) return h('div', { class: 'qa-row bad' }, h('span', {}, `“${it.raw}”`), h('span', { class: 'chip bad' }, it.error));
-      const typeOf = it.kind;
-      return h('div', { class: `qa-row${it.mismatch ? ' bad' : ''}` },
-        h('span', { class: `chip ${it.kind === 'income' ? 'good' : ''}` }, it.kind === 'income' ? 'Thu' : 'Chi'),
-        h('input', { type: 'text', value: it.note, 'aria-label': 'Ghi chú', oninput: (e) => { it.note = e.target.value; } }),
-        h('strong', { class: 'mono' }, fmtMoney(it.amount, it.currency)),
-        select(categoryOptions(typeOf, '—'), it.categoryId, (v) => { it.categoryId = v; }, { 'aria-label': 'Danh mục' }),
-        it.mismatch ? h('span', { class: 'chip bad' }, `≠ ${(accById(st.accountId) || {}).currency}`) : null,
-        h('button', { class: 'icon-btn', 'aria-label': 'Bỏ khoản này', onclick: () => { st.items.splice(idx, 1); drawList(); } }, '✕'));
-    }));
+  }
+
+  function drawList() {
+    list.replaceChildren(...st.items.map((it) => (it.error
+      ? h('div', { class: 'qa-row bad' }, h('span', {}, `“${it.raw}”`), h('span', { class: 'chip bad' }, it.error))
+      : buildItem(it))));
+    refreshInfo();
+  }
+
+  function buildItem(it) {
+    const d = it.debt;
+    const item = h('div', { class: 'qa-item' });
+    const kindChip = h('span', { class: 'chip' });
+    const catSel = select(categoryOptions(it.kind, '—'), it.categoryId, (v) => { it.categoryId = v; }, { 'aria-label': 'Danh mục' });
+    const row = h('div', { class: 'qa-row' },
+      kindChip,
+      h('input', { type: 'text', value: it.note, 'aria-label': 'Ghi chú', oninput: (e) => { it.note = e.target.value; } }),
+      h('strong', { class: 'mono' }, fmtMoney(it.amount, it.currency)),
+      catSel,
+      it.mismatch ? h('span', { class: 'chip bad' }, `≠ ${(accById(st.accountId) || {}).currency}`) : null,
+      h('button', { class: 'icon-btn', 'aria-label': 'Bỏ khoản này', onclick: () => { st.items.splice(st.items.indexOf(it), 1); drawList(); } }, '✕'));
+    const panel = h('div', { class: 'qa-share' });
+    const bar = h('div', { class: 'qa-share-bar' },
+      h('span', { class: 'sub' }, 'Chia cho người trong Vay nợ'),
+      seg(SHARE_MODE_OPTS, d.mode, (v) => setMode(v)));
+    item.append(row);
+    if (!it.mismatch) item.append(bar, panel);
+
+    const inputs = new Map();
+    let amountBox = null;
+    let summary = null;
+    let resetBtn = null;
+
+    function setMode(v) {
+      d.mode = v;
+      d.manual = {};
+      d.bad = {};
+      if (v !== 'none' && !d.partyIds.length) d.partyIds = lastSharePeople();
+      buildPanel();
+    }
+
+    function togglePerson(id, on) {
+      d.partyIds = on ? [...d.partyIds, id] : d.partyIds.filter((x) => x !== id);
+      if (!on) { delete d.manual[id]; delete d.bad[id]; }
+      drawAmounts();
+      sync();
+    }
+
+    function onAmountInput(id, el) {
+      const t = el.value.trim();
+      delete d.bad[id];
+      if (!t) delete d.manual[id];
+      else {
+        const r = parseExpr(t);
+        if (r && r.total > 0) d.manual[id] = r.total; else { delete d.manual[id]; d.bad[id] = true; }
+      }
+      el.classList.toggle('bad', !!d.bad[id]);
+      sync();
+    }
+
+    function drawAmounts() {
+      inputs.clear();
+      const debts = debtBalances(store.all('txs'));
+      amountBox.replaceChildren(...d.partyIds.filter((id) => partyById(id)).map((id) => {
+        const cur = (debts.get(id) || {})[it.currency] || 0;
+        const now = cur > 0 ? `đang nợ mình ${fmtMoney(cur, it.currency)}` : cur < 0 ? `mình đang nợ ${fmtMoney(-cur, it.currency)}` : 'hiện chưa nợ';
+        const inp = h('input', {
+          type: 'text', inputmode: 'decimal', autocomplete: 'off', 'aria-label': `Phần của ${nameOf(id)}`,
+          oninput: (e) => onAmountInput(id, e.target),
+          onchange: (e) => { if (d.bad[id]) { delete d.bad[id]; e.target.classList.remove('bad'); } sync(true); },
+        });
+        inputs.set(id, inp);
+        return h('label', { class: 'qa-amt' },
+          h('span', { class: 'qa-who' }, h('b', {}, nameOf(id)), h('span', { class: 'sub' }, now)),
+          inp, h('span', { class: 'qa-cur mono' }, (CUR_INFO[it.currency] || {}).symbol || it.currency));
+      }));
+    }
+
+    function buildPanel() {
+      panel.replaceChildren();
+      panel.hidden = d.mode === 'none';
+      inputs.clear();
+      if (d.mode !== 'none') {
+        const people = sharePartyList();
+        const pick = (p) => {
+          const on = d.partyIds.includes(p.id);
+          const cb = h('input', { type: 'checkbox', checked: on, onchange: (e) => { lab.classList.toggle('on', e.target.checked); togglePerson(p.id, e.target.checked); } });
+          const lab = h('label', { class: `pick${on ? ' on' : ''}` }, cb, p.name);
+          return lab;
+        };
+        amountBox = h('div', { class: 'qa-amounts' });
+        summary = h('p', { class: 'field-hint qa-sum' });
+        resetBtn = h('button', { type: 'button', class: 'btn small ghost', onclick: () => { d.manual = {}; d.bad = {}; sync(true); } }, 'Chia đều lại');
+        panel.append(...[
+          h('p', { class: 'field-hint' }, d.mode === 'add'
+            ? 'Mình trả hết số tiền này; những người được chọn nợ mình phần của họ.'
+            : 'Những người được chọn đưa tiền cho mình; nợ của họ giảm đúng số đó.'),
+          h('div', { class: 'qa-people' },
+            ...people.map(pick),
+            h('button', { type: 'button', class: 'chip muted qa-addp', onclick: () => openPartyForm({ onSaved: (p) => { d.partyIds = [...d.partyIds, p.id]; buildPanel(); } }) }, '＋ Thêm người')),
+          people.length ? null : h('p', { class: 'field-hint' }, 'Chưa có ai trong danh sách Vay nợ — bấm “＋ Thêm người”.'),
+          d.mode === 'add'
+            ? h('label', { class: 'check' },
+              h('input', { type: 'checkbox', checked: d.includeMe, onchange: (e) => { d.includeMe = e.target.checked; lsSet(SHARE_ME_KEY, d.includeMe ? '1' : '0'); sync(true); } }),
+              ' Tính cả phần của mình (ghi thành chi tiêu của mình)')
+            : null,
+          amountBox, summary,
+          h('div', { class: 'qa-share-actions' },
+            resetBtn,
+            h('button', { type: 'button', class: 'btn small ghost', onclick: () => applyToAll() }, 'Dùng cho tất cả khoản')),
+        ].filter(Boolean));
+        drawAmounts();
+      }
+      sync(true);
+    }
+
+    /** Cập nhật phần động (chip, tóm tắt, ô số tiền) mà không dựng lại ô đang gõ. */
+    function sync(refill = false) {
+      const plan = planOf(it);
+      const active = d.mode !== 'none';
+      kindChip.textContent = d.mode === 'add' ? 'Nợ +' : d.mode === 'sub' ? 'Nợ −' : it.kind === 'income' ? 'Thu' : 'Chi';
+      kindChip.className = `chip ${d.mode === 'add' ? 'warn' : d.mode === 'sub' || it.kind === 'income' ? 'good' : ''}`;
+      catSel.hidden = d.mode === 'sub' || (d.mode === 'add' && !d.includeMe);
+      item.classList.toggle('bad', !!it.mismatch || (active && !plan.ok));
+      if (active) {
+        for (const [id, inp] of inputs) {
+          const isManual = id in d.manual;
+          inp.classList.toggle('auto', !isManual);
+          if (document.activeElement === inp && !refill) continue; // đang gõ → không đụng vào
+          if (isManual) inp.value = String(d.manual[id]);
+          else inp.value = plan.ok ? String(plan.shares[id]) : '';
+        }
+        summary.textContent = describeShare({ mode: d.mode, amount: it.amount, currency: it.currency, plan, nameOf });
+        summary.classList.toggle('bad', !plan.ok);
+        resetBtn.hidden = !Object.keys(d.manual).length;
+      }
+      refreshInfo();
+    }
+
+    function applyToAll() {
+      const others = st.items.filter((x) => x !== it && !x.error && !x.mismatch);
+      if (!others.length) { toast('Chỉ có một khoản.', 'info'); return; }
+      for (const x of others) {
+        x.debt.mode = d.mode;
+        x.debt.partyIds = [...d.partyIds];
+        x.debt.includeMe = d.includeMe;
+        x.debt.manual = {};
+        x.debt.bad = {};
+      }
+      drawList();
+      toast(`Đã áp dụng cho ${others.length} khoản khác.`, 'ok');
+    }
+
+    buildPanel();
+    return item;
   }
 
   async function onSave() {
-    const ok = st.items.filter((i) => !i.error && !i.mismatch);
+    const ok = st.items.filter(itemOk);
     if (!ok.length) return;
     const acc = accById(st.accountId);
+    const docs = [];
+    let n = 0;
+    let shared = 0;
+    let lastPeople = null;
+    for (const i of ok) {
+      const ts = () => Date.now() + (n += 1);
+      if (i.debt.mode === 'none') {
+        docs.push({ date: st.date, kind: i.kind, amount: i.amount, currency: acc.currency, accountId: acc.id, categoryId: i.categoryId || '', note: i.note, ts: ts() });
+      } else {
+        const plan = planOf(i);
+        for (const t of buildShareTxs({ mode: i.debt.mode, plan, date: st.date, currency: acc.currency, accountId: acc.id, note: i.note, categoryId: i.categoryId, nameOf })) docs.push({ ...t, ts: ts() });
+        shared += 1;
+        lastPeople = i.debt.partyIds;
+      }
+    }
     try {
-      await store.putMany('txs', ok.map((i, n) => ({
-        date: st.date, kind: i.kind, amount: i.amount, currency: acc.currency, accountId: acc.id,
-        categoryId: i.categoryId || '', note: i.note, ts: Date.now() + n,
-      })));
+      await store.putMany('txs', docs);
       lsSet('qltc:lastAccount', acc.id);
+      if (lastPeople) lsSet(SHARE_PEOPLE_KEY, JSON.stringify(lastPeople));
       m.close();
-      toast(`Đã lưu ${ok.length} giao dịch.`, 'ok');
+      toast(shared ? `Đã lưu ${docs.length} giao dịch (${shared} khoản gắn với Vay nợ).` : `Đã lưu ${docs.length} giao dịch.`, 'ok');
     } catch (e) { toast(errMsg(e), 'error'); }
   }
 
