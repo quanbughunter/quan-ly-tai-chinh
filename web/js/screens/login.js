@@ -21,7 +21,7 @@ export function renderLogin(root, onSignedIn) {
       btn.textContent = 'Đăng nhập';
     }
   } },
-  h('div', { class: 'login-logo' }, '💸'),
+  h('img', { class: 'login-logo', src: 'icons/icon.svg', alt: 'Logo Quản lý tài chính', width: 72, height: 72 }),
   h('h1', {}, 'Quản lý tài chính'),
   h('p', { class: 'sub center' }, 'Đăng nhập để xem sổ của bạn. Dữ liệu được mã hóa khi truyền và chỉ tài khoản của bạn đọc được.'),
   field('Email', email),

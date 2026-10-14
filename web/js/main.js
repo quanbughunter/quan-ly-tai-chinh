@@ -59,7 +59,7 @@ let shell = null; // { view, side, tabs, banner }
 
 function buildShell(app) {
   const side = h('aside', { class: 'side' },
-    h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark' }, '💸'), h('span', {}, 'Quản lý tài chính')),
+    h('a', { class: 'brand', href: '#/' }, h('img', { class: 'brand-mark', src: 'icons/icon.svg', alt: '', width: 38, height: 38 }), h('span', {}, 'Quản lý tài chính')),
     h('nav', { 'aria-label': 'Điều hướng' }, SIDE_ORDER.map((k) => h('a', { class: 'side-link', href: `#/${k === 'home' ? '' : k}`, 'data-route': k }, icon(ROUTES[k].icon), h('span', {}, ROUTES[k].title)))),
     h('button', { class: 'btn primary block', onclick: openAddMenu }, '＋ Thêm giao dịch'),
     h('p', { class: 'side-hint' }, 'Phím tắt: N = thêm, Q = nhập nhanh'));

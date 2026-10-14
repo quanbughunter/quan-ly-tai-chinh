@@ -21,6 +21,8 @@ web/                 ứng dụng (index.html, js/, css/, sw.js, manifest) — t
   js/store.js        lưu trữ: Supabase (đám mây) hoặc trình duyệt (chế độ thử)
 supabase/schema.sql  bảng records + chính sách RLS
 tools/import_xlsx.mjs  nhập từ file Excel cũ + đối chiếu số dư
+tools/make_logo.py   vẽ logo QLTC (Q·C chồng nhau, L·T chung một thanh ngang) và xuất icon web + Android
+assets/              icon-only / icon-foreground / icon-background (PNG) — nguồn để dựng icon Android
 tests/               test cho phần tính toán (node:test, không cần cài gì)
 .github/workflows/   pages.yml (web) · android.yml (APK)   ← tạo bằng `npm run setup:workflows` (bản gốc ở setup/)
 capacitor.config.json  cấu hình đóng gói APK

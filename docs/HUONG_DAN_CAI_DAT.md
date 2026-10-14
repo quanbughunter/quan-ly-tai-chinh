@@ -76,6 +76,8 @@ Việc này chạy trên máy bạn; dữ liệu không đi đâu ngoài file ri
 3. Chép file sang điện thoại (cáp, Zalo/Telegram "Saved Messages", Google Drive…). Mở file; Android sẽ hỏi cho phép **cài ứng dụng từ nguồn không rõ** cho ứng dụng bạn dùng để mở file → cho phép → **Cài đặt**.
 4. Mở app, đăng nhập một lần; sau đó app giữ phiên đăng nhập.
 
+Icon app là logo QLTC (nền chàm; Q và C chồng lên nhau, L và T chung một thanh ngang). Icon Android được workflow tự tạo từ ba file PNG trong `assets/`; muốn đổi hình, sửa màu/nét trong `tools/make_logo.py` rồi chạy `python3 tools/make_logo.py` (cần Python; xuất PNG cần thêm Playwright).
+
 Đây là bản **debug** (đủ dùng cho cá nhân, không đưa lên Google Play).
 
 **Cài bản mới đè bản cũ:** mỗi lần dựng, GitHub tạo một chữ ký khác nhau, nên Android sẽ không cho cài đè. Cách đơn giản: gỡ app cũ rồi cài bản mới (dữ liệu nằm trên Supabase nên không mất gì, chỉ phải đăng nhập lại). Muốn cài đè được: tạo một khóa ký cố định một lần theo hướng dẫn trong chú thích của `.github/workflows/android.yml` rồi lưu vào secret `DEBUG_KEYSTORE_BASE64`.

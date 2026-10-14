@@ -6,4 +6,5 @@ import './fx.test.js';
 import './deals.test.js';
 import './scholarship.test.js';
 import './share.test.js';
+import './assets.test.js';
 import './quickadd.test.js';
