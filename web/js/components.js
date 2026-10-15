@@ -4,6 +4,7 @@ import { h, money, chip } from './ui.js';
 import { store } from './store.js';
 import { TX_KINDS } from './model.js';
 import { fmtDate } from './dates.js';
+import { accAmount } from './calc.js';
 
 const KIND_GLYPH = { income: '＋', expense: '－', transfer: '⇄', lend: '↗', repay_in: '↙', borrow: '↘', repay_out: '↖', adjust: '≈' };
 const POSITIVE = new Set(['income', 'repay_in', 'borrow']);
@@ -40,6 +41,11 @@ export function txRow(t, { onClick, showDate = false } = {}) {
   const right = [h('div', { class: `amt mono ${amt.cls}` }, money(amt.value, t.currency, { sign: amt.cls === 'pos' }))];
   if (t.kind === 'transfer' && t.toAmount != null && to && to.currency !== t.currency) {
     right.push(h('div', { class: 'sub mono' }, `→ ${money(t.toAmount, to.currency)}`));
+  }
+  // Khoản vay nợ khác tiền tệ với tài khoản: hiện thêm số tiền thật sự ra / vào tài khoản.
+  if (a && t.accountAmount != null && t.accountAmount !== '' && a.currency !== t.currency && amt.cls) {
+    const v = accAmount(t);
+    right.push(h('div', { class: 'sub mono' }, `${a.name}: ${money(amt.cls === 'pos' ? v : -v, a.currency, { sign: amt.cls === 'pos' })}`));
   }
   return h('button', { class: 'row', type: 'button', onclick: onClick },
     h('span', { class: `row-ico k-${t.kind}` }, c && c.icon ? c.icon : KIND_GLYPH[t.kind] || '•'),

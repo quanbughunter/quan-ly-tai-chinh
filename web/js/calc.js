@@ -7,20 +7,33 @@ import { monthOf, lastMonths } from './dates.js';
 /** Dấu ảnh hưởng lên công nợ của đối tác: dương = người đó nợ mình nhiều hơn. */
 export const DEBT_SIGN = { lend: 1, repay_in: -1, borrow: -1, repay_out: 1 };
 
+/**
+ * Số tiền thật sự đi vào / đi ra tài khoản, tính theo tiền tệ CỦA TÀI KHOẢN.
+ * Thường bằng `amount`. Khoản vay nợ có thể khác tiền tệ với tài khoản (ví dụ đổi đô la ở Vietcombank
+ * rồi chuyển đồng cho người vay): khi đó `amount`/`currency` là khoản nợ (VND) còn `accountAmount`
+ * là số đô la bị trừ khỏi tài khoản.
+ */
+export function accAmount(tx) {
+  const v = tx.accountAmount;
+  if (v != null && v !== '' && Number(v) > 0) return Number(v);
+  return Number(tx.amount) || 0;
+}
+
 /** Các thay đổi số dư [accountId, delta] của một giao dịch. */
 export function accountEffects(tx) {
   const a = Number(tx.amount) || 0;
+  const s = accAmount(tx);
   const out = [];
   switch (tx.kind) {
     case 'income':
     case 'repay_in':
     case 'borrow':
-      if (tx.accountId) out.push([tx.accountId, a]);
+      if (tx.accountId) out.push([tx.accountId, s]);
       break;
     case 'expense':
     case 'lend':
     case 'repay_out':
-      if (tx.accountId) out.push([tx.accountId, -a]);
+      if (tx.accountId) out.push([tx.accountId, -s]);
       break;
     case 'transfer':
       if (tx.accountId) out.push([tx.accountId, -a]);

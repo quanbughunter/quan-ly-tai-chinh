@@ -6,7 +6,7 @@ import { TX_KINDS, ACCOUNT_KINDS, PARTY_ROLES } from './model.js';
 import { todayStr } from './dates.js';
 import { accountBalances, debtBalances, DEBT_SIGN } from './calc.js';
 import { parseQuick } from './quickadd.js';
-import { fmtMoney, fmtNum, parseExpr, CUR_INFO } from './money.js';
+import { fmtMoney, fmtNum, parseExpr, impliedRate, CUR_INFO } from './money.js';
 import { planShare, buildShareTxs, describeShare } from './share.js';
 import { requestOpenDeal } from './deals.js';
 import { requestOpenScholarship, SCHOLARSHIP_NAME } from './scholarship.js';
@@ -69,7 +69,9 @@ export function openTxForm(init = {}) {
     toAccountId: t ? t.toAccountId || '' : '',
     amount: t ? t.amount : '',
     toAmount: t && t.toAmount != null ? t.toAmount : '',
-    currency: t ? t.currency : 'VND',
+    // Với Vay nợ: tiền tệ của khoản nợ (có thể khác tiền tệ tài khoản); các nhóm khác luôn theo tài khoản.
+    currency: t ? t.currency : (accById(defAcc) || {}).currency || 'VND',
+    accountAmount: t && t.accountAmount != null ? t.accountAmount : '',
     partyId: t ? t.partyId || '' : init.partyId || '',
     categoryId: t ? t.categoryId || '' : '',
     note: t ? t.note || '' : '',
@@ -78,13 +80,20 @@ export function openTxForm(init = {}) {
   const m = modal({ title: t ? 'Sửa giao dịch' : 'Thêm giao dịch', body: root, actions: [] });
   let amountCtl;
   let toAmountCtl;
+  let accAmtCtl;
+  let refreshRate = () => {};
 
   const kindOf = () => (st.group === 'debt' ? st.debtKind : st.group);
   const acc = () => accById(st.accountId);
 
   function draw() {
     const kids = [];
-    kids.push(seg(GROUPS, st.group, (v) => { st.group = v; if (v !== 'debt' && !st.accountId) st.accountId = defAcc; draw(); }));
+    kids.push(seg(GROUPS, st.group, (v) => {
+      st.group = v;
+      if (v !== 'debt' && !st.accountId) st.accountId = defAcc;
+      if (v === 'debt' && acc()) st.currency = acc().currency; // mặc định: khoản nợ cùng tiền tệ với tài khoản
+      draw();
+    }));
     if (st.group === 'debt') {
       kids.push(field('Loại', select(DEBT_KINDS.map((k) => ({ value: k, label: TX_KINDS[k] })), st.debtKind, (v) => { st.debtKind = v; draw(); })));
       const pSel = select(partyOptions(), st.partyId, (v) => { st.partyId = v; });
@@ -106,13 +115,30 @@ export function openTxForm(init = {}) {
     }
 
     const a = acc();
-    const cur = a ? a.currency : st.currency;
-    amountCtl = moneyInput({ value: st.amount, currency: cur, onChange: (v) => { st.amount = Number.isNaN(v) ? '' : v; } });
-    const amtLabel = st.group === 'adjust' ? 'Số tiền điều chỉnh (+ hoặc −)' : 'Số tiền';
-    if (!a && st.group === 'debt') {
-      kids.push(field('Tiền tệ', select(currencyOptions, st.currency, (v) => { st.currency = v; amountCtl.setCurrency(v); })));
+    const isDebt = st.group === 'debt';
+    const cur = isDebt ? st.currency : (a ? a.currency : st.currency);
+    const cross = isDebt && !!a && a.currency !== cur; // khoản nợ khác tiền tệ với tài khoản
+    accAmtCtl = null;
+    refreshRate = () => {};
+    amountCtl = moneyInput({ value: st.amount, currency: cur, onChange: (v) => { st.amount = Number.isNaN(v) ? '' : v; refreshRate(); } });
+    const amtLabel = st.group === 'adjust' ? 'Số tiền điều chỉnh (+ hoặc −)' : cross ? 'Số tiền ghi nợ' : 'Số tiền';
+    if (isDebt) {
+      // Chọn được tiền tệ riêng cho khoản nợ: ví dụ trừ đô la ở Vietcombank nhưng người vay nhận và nợ bằng đồng.
+      kids.push(field('Tiền tệ khoản nợ', select(currencyOptions, st.currency, (v) => { st.currency = v; draw(); }),
+        a && a.currency !== cur ? `Khác tiền tệ của tài khoản (${a.currency}) — nhập thêm số tiền thực ra / vào tài khoản bên dưới.` : null));
     }
-    kids.push(field(`${amtLabel}${a ? ` (${cur})` : ''}`, amountCtl.el, 'Gõ được: 25k, 1,5tr, 3tr+500k'));
+    kids.push(field(`${amtLabel}${cur && (a || isDebt) ? ` (${cur})` : ''}`, amountCtl.el, 'Gõ được: 25k, 1,5tr, 3tr+500k'));
+
+    if (cross) {
+      const outflow = st.debtKind === 'lend' || st.debtKind === 'repay_out';
+      const rate = h('span', { class: 'field-hint mono' });
+      const rateText = () => { const r = impliedRate(amountCtl.get(), cur, st.accountAmount, a.currency); return r ? `Tỷ giá ngầm: ${r}` : ''; };
+      refreshRate = () => { rate.textContent = rateText(); };
+      accAmtCtl = moneyInput({ value: st.accountAmount, currency: a.currency, onChange: (v) => { st.accountAmount = Number.isNaN(v) ? '' : v; refreshRate(); } });
+      kids.push(field(`${outflow ? 'Trừ khỏi' : 'Cộng vào'} ${a.name} (${a.currency})`, accAmtCtl.el, 'Số tiền thực tế đi ra / đi vào tài khoản này.'));
+      kids.push(rate);
+      refreshRate();
+    }
 
     if (st.group === 'transfer') {
       const to = accById(st.toAccountId);
@@ -147,15 +173,22 @@ export function openTxForm(init = {}) {
     const kind = kindOf();
     const a = acc();
     const amount = Number(amountCtl.get());
+    const debtCur = st.group === 'debt' ? st.currency : null;
     if (kind === 'adjust') { if (!amount) return toast('Nhập số tiền điều chỉnh khác 0.', 'error'); } else if (!(amount > 0)) return toast('Nhập số tiền lớn hơn 0.', 'error');
     if (!st.date) return toast('Chọn ngày.', 'error');
     if (kind !== 'lend' && kind !== 'repay_in' && kind !== 'borrow' && kind !== 'repay_out' && !a) return toast('Chọn tài khoản.', 'error');
     if (st.group === 'debt' && !st.partyId) return toast('Chọn người liên quan đến khoản vay nợ.', 'error');
     const doc = {
       id: t ? t.id : undefined, ts: t ? t.ts : undefined,
-      date: st.date, kind, amount, currency: a ? a.currency : st.currency,
+      date: st.date, kind, amount, currency: debtCur || (a ? a.currency : st.currency),
       accountId: a ? a.id : '', note: st.note.trim(),
     };
+    if (debtCur && a && a.currency !== debtCur) {
+      const outflow = kind === 'lend' || kind === 'repay_out';
+      const aa = accAmtCtl ? Number(accAmtCtl.get()) : NaN;
+      if (!(aa > 0)) return toast(`Nhập số tiền ${outflow ? 'trừ khỏi' : 'cộng vào'} tài khoản (${a.currency}).`, 'error');
+      doc.accountAmount = aa;
+    }
     if (st.group === 'expense' || st.group === 'income') doc.categoryId = st.categoryId || '';
     if (st.group === 'debt') doc.partyId = st.partyId;
     if (st.group === 'transfer') {

@@ -66,7 +66,7 @@ Tất cả lưu trong một bảng `records(collection, data jsonb)` trên Supab
 | `accounts` | `name`, `kind` (tiền mặt, ngân hàng, thẻ, tiết kiệm, ví, crypto), `currency`, `opening`, `networth` (có tính vào tài sản không), `archived` |
 | `parties` | `name`, `role` (người quen vay mượn / khách đổi tiền / người nhà), `note` |
 | `categories` | `name`, `type` (thu/chi), `icon` |
-| `txs` | `date`, `kind`, `amount`, `currency`, `accountId`, `toAccountId`, `toAmount`, `partyId`, `categoryId`, `note`, `dealId` (chỉ có ở khoản lãi tự cộng khi chốt giao dịch), `scholarshipId` (chỉ có ở khoản học bổng tự cộng khi đánh dấu đã nhận) |
+| `txs` | `date`, `kind`, `amount`, `currency`, `accountId`, `toAccountId`, `toAmount`, `partyId`, `categoryId`, `note`, `accountAmount` (chỉ có ở khoản vay nợ khác tiền tệ với tài khoản), `dealId` (chỉ có ở khoản lãi tự cộng khi chốt giao dịch), `scholarshipId` (chỉ có ở khoản học bổng tự cộng khi đánh dấu đã nhận) |
 | `deals` | Lệnh đổi tiền: `dir` (`sang`/`ve`), `status` (`quote` báo giá / `done` đã chốt), `date`, `partyId`, `inputs`, `actual`, `profit` (VND, chỉ khi đã chốt), `profitTxId` (giao dịch lãi đã cộng vào thẻ), `postSkipped` |
 | `dorm` | `paidDate`, `amount`, `payer`, `period`, `receiptSent` |
 | `scholarships` | Mục «Học bổng MIIGAiK»: `month`, `availableDate`, `receivedDate` (có = đã nhận), `amount` (₽), `currency` (`RUB`), `txId` (khoản thu đã cộng vào thẻ) |
@@ -85,6 +85,21 @@ Tất cả lưu trong một bảng `records(collection, data jsonb)` trên Supab
 | `borrow` (đi vay) | + `amount` | nợ **−** (mình nợ họ) |
 | `repay_out` (trả nợ) | − `amount` | nợ **+** |
 | `adjust` | ± `amount` (đối soát số dư) | |
+
+### Vay nợ khác tiền tệ với tài khoản (ví dụ: đổi đô la ở Vietcombank rồi chuyển đồng cho người vay)
+
+Khoản nợ và tài khoản **không bắt buộc cùng tiền tệ**. Trong form Vay nợ, sau khi chọn tài khoản, ô **Tiền tệ khoản nợ** mặc định bằng tiền tệ tài khoản (hành vi cũ); đổi sang tiền tệ khác thì app hiện thêm ô số tiền thật sự đi ra / đi vào tài khoản.
+
+| Trường | Ý nghĩa |
+|---|---|
+| `amount`, `currency` | Khoản nợ: người đó nợ mình bao nhiêu, bằng tiền tệ nào (ví dụ 7.800.000 VND) |
+| `accountAmount` | Số tiền đi ra (`lend`, `repay_out`) hoặc đi vào (`repay_in`, `borrow`) tài khoản, theo tiền tệ **của tài khoản** (ví dụ 300 USD). Không có trường này = cùng tiền tệ, số dư dùng `amount` như trước |
+
+- Số dư tài khoản dùng `accountAmount`; công nợ của người đó dùng `amount` + `currency`. Một giao dịch duy nhất nên tài khoản và sổ nợ luôn khớp, không còn bước "chuyển sang tài khoản đồng rồi mới cho vay".
+- App tính **tỷ giá ngầm** (ví dụ `1 USD = 26.000 VND`) từ hai số bạn nhập để đối chiếu với tỷ giá ngân hàng.
+- Đổi tài khoản sang một tài khoản cùng tiền tệ với khoản nợ thì `accountAmount` tự bị bỏ.
+- Tổng quan quy đổi riêng từng phần: tiền thật (USD giảm) và khoản phải thu (VND tăng), theo tỷ giá trong Cài đặt.
+- Logic ở `calc.js` (`accAmount`, `accountEffects`), `money.js` (`impliedRate`); kiểm thử trong `tests/calc.test.js`, `tests/money.test.js`.
 
 Công nợ tính riêng theo **từng người × từng tiền tệ**, nên một người vừa nợ USD vừa nợ VND không còn bị nhập chung cột.
 
@@ -179,6 +194,14 @@ GitHub Actions ── dựng APK debug bằng Capacitor, xuất file tải về
 - **Ngoại tuyến:** sau lần tải đầu, app lưu bản sao để mở được khi mất mạng (chỉ xem). Ghi dữ liệu yêu cầu có mạng.
 - **Hai thiết bị cùng sửa:** bản ghi nào sửa sau thì thắng (đủ dùng cho một người).
 - **Chế độ thử:** nếu chưa cấu hình Supabase, app chạy bằng dữ liệu trên máy để bạn thử ngay.
+
+### Logo và icon
+
+Logo **QLTC** vẽ bằng SVG (không dùng phông chữ): **Q** và **C** là hai vòng chồng lên nhau (Q nằm trên, C tím nhạt nằm dưới), **L** và **T** dùng chung một thanh ngang (chân chữ L chính là thanh ngang chữ T), đuôi chữ Q vắt qua góc chữ L với một khe hở nhỏ để thấy chỗ lồng nhau. Nền chàm, Q trắng, L·T hồng san hô.
+
+- Nguồn duy nhất: `tools/make_logo.py` (màu, độ dày nét, độ dài đuôi Q nằm ở đầu file). Chạy lại sẽ ghi `web/icons/icon.svg` và các PNG: `icon-192/512`, `icon-maskable-512`, `apple-touch-icon` (web/PWA) và `assets/icon-only|foreground|background.png` (Android).
+- Icon Android do workflow tự dựng bằng `capacitor-assets` từ ba PNG trong `assets/`; lớp foreground thu nhỏ để nằm trong vùng an toàn nên không bị cắt ở launcher dạng tròn.
+- Trong app, logo là ảnh `icons/icon.svg` ở thanh bên và màn hình đăng nhập (thay cho biểu tượng 💸 cũ). `tests/assets.test.js` kiểm tra mọi icon mà manifest, `index.html` và `sw.js` nhắc tới đều có thật.
 
 ## 8. Cần bạn xác nhận (mình đã giả định và đánh dấu trong app)
 

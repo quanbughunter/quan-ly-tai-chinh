@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAmount, parseExpr, fmtMoney, fmtNum, roundTo } from '../web/js/money.js';
+import { parseAmount, parseExpr, fmtMoney, fmtNum, roundTo, impliedRate } from '../web/js/money.js';
 
 test('parseAmount: hậu tố k / tr / tỷ', () => {
   assert.equal(parseAmount('25k'), 25000);
@@ -50,4 +50,13 @@ test('fmtMoney / fmtNum', () => {
 
 test('roundTo tránh sai số dấu phẩy động', () => {
   assert.equal(roundTo(0.1 + 0.2, 6), 0.3);
+});
+
+test('impliedRate: viết "1 đơn vị lớn = n đơn vị nhỏ", thiếu số hoặc cùng tiền tệ thì rỗng', () => {
+  assert.equal(impliedRate(7_800_000, 'VND', 300, 'USD'), `1 USD = ${fmtNum(26000, 2)} VND`);
+  assert.equal(impliedRate(300, 'USD', 7_800_000, 'VND'), `1 USD = ${fmtNum(26000, 2)} VND`);
+  assert.equal(impliedRate(1500, 'RUB', 5, 'USD'), `1 USD = ${fmtNum(300, 2)} RUB`);
+  assert.equal(impliedRate('', 'VND', 300, 'USD'), '');
+  assert.equal(impliedRate(100, 'USD', 100, 'USD'), '');
+  assert.equal(impliedRate(0, 'VND', 300, 'USD'), '');
 });

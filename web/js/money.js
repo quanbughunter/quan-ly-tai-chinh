@@ -45,6 +45,17 @@ export function fmtMoney(n, cur = 'VND', opts = {}) {
   return cur === 'USDT' ? `${s}${body} USDT` : `${s}${body} ${info.symbol}`;
 }
 
+/**
+ * Tỷ giá ngầm giữa hai số tiền khác tiền tệ, viết theo cách dễ đọc:
+ * (7.800.000 VND, 300 USD) → "1 USD = 26.000 VND". Trả '' nếu thiếu số hoặc cùng tiền tệ.
+ */
+export function impliedRate(x, xCur, y, yCur) {
+  const a = Number(x);
+  const b = Number(y);
+  if (!(a > 0) || !(b > 0) || xCur === yCur) return '';
+  return b / a < 1 ? `1 ${yCur} = ${fmtNum(a / b, 2)} ${xCur}` : `1 ${xCur} = ${fmtNum(b / a, 2)} ${yCur}`;
+}
+
 const SUFFIX = {
   k: 1e3, 'nghìn': 1e3, 'ngàn': 1e3, ng: 1e3,
   tr: 1e6, 'triệu': 1e6, m: 1e6, 'củ': 1e6,

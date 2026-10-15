@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  accountBalances, debtBalances, overview, periodStats, monthlySeries, filterTxs, groupByDate, budgetStatus, toBase,
+  accountBalances, debtBalances, overview, periodStats, monthlySeries, filterTxs, groupByDate, budgetStatus, toBase, accAmount,
 } from '../web/js/calc.js';
 
 const accounts = [
@@ -94,4 +94,40 @@ test('groupByDate: mới → cũ', () => {
   const g = groupByDate(txs, rates);
   assert.equal(g[0].date, '2026-08-30');
   assert.equal(g[0].expense, 100 * 300 + 5_000_000);
+});
+
+// ── Vay nợ khác tiền tệ với tài khoản: đổi đô la ở ngân hàng rồi chuyển đồng cho người vay ──
+const usdAccounts = [
+  { id: 'vcb', name: 'Vietcombank', currency: 'USD', opening: 2500 },
+  { id: 'mb2', name: 'Thẻ MB', currency: 'VND', opening: 1_000_000 },
+];
+
+test('cho vay VND từ tài khoản USD: trừ đô la, người vay nợ đồng', () => {
+  const list = [{ id: 'a', date: '2026-10-15', kind: 'lend', amount: 7_800_000, currency: 'VND', accountAmount: 300, accountId: 'vcb', partyId: 'p1', ts: 1 }];
+  const b = accountBalances(usdAccounts, list);
+  assert.equal(b.get('vcb'), 2200); // chỉ trừ 300 USD, không trừ 7,8 triệu "đô"
+  assert.equal(b.get('mb2'), 1_000_000);
+  assert.deepEqual(debtBalances(list).get('p1'), { VND: 7_800_000 });
+  const o = overview({ accounts: usdAccounts, txs: list, rates: { USD: 26000 } });
+  assert.deepEqual(o.cash, { USD: 2200, VND: 1_000_000 });
+  assert.deepEqual(o.receivable, { VND: 7_800_000 });
+});
+
+test('nhận trả bằng VND vào tài khoản USD: cộng đô la, nợ VND giảm', () => {
+  const list = [
+    { id: 'a', date: '2026-10-15', kind: 'lend', amount: 7_800_000, currency: 'VND', accountAmount: 300, accountId: 'vcb', partyId: 'p1', ts: 1 },
+    { id: 'b', date: '2026-10-20', kind: 'repay_in', amount: 2_600_000, currency: 'VND', accountAmount: 100, accountId: 'vcb', partyId: 'p1', ts: 2 },
+  ];
+  assert.equal(accountBalances(usdAccounts, list).get('vcb'), 2300);
+  assert.deepEqual(debtBalances(list).get('p1'), { VND: 5_200_000 });
+});
+
+test('accountAmount trống / không hợp lệ thì dùng amount (khoản cùng tiền tệ như trước)', () => {
+  assert.equal(accAmount({ amount: 500, currency: 'USD' }), 500);
+  assert.equal(accAmount({ amount: 500, accountAmount: '' }), 500);
+  assert.equal(accAmount({ amount: 500, accountAmount: null }), 500);
+  assert.equal(accAmount({ amount: 500, accountAmount: 0 }), 500);
+  assert.equal(accAmount({ amount: 7_800_000, accountAmount: 300 }), 300);
+  const same = [{ id: 'x', date: '2026-10-15', kind: 'lend', amount: 100, currency: 'USD', accountId: 'vcb', partyId: 'p1', ts: 1 }];
+  assert.equal(accountBalances(usdAccounts, same).get('vcb'), 2400);
 });
