@@ -56,8 +56,9 @@ export function openTxForm(init = {}) {
   if (t && t.dealId) return openDealTxNotice(t);
   if (t && t.scholarshipId) return openScholarshipTxNotice(t);
   if (!store.all('accounts').length) {
-    toast('Hãy tạo ít nhất một tài khoản trước.', 'error');
-    location.hash = '#/accounts';
+    // Chưa có tài khoản nào: mở form tạo tài khoản ngay, lưu xong quay lại form giao dịch.
+    toast('Chưa có tài khoản nào — tạo tài khoản đầu tiên nhé.');
+    openAccountForm(null, { onSaved: () => openTxForm(init) });
     return null;
   }
   const defAcc = init.accountId || (t && t.accountId) || lsGet('qltc:lastAccount') || (accountOptions()[0] || {}).value || '';
@@ -108,10 +109,15 @@ export function openTxForm(init = {}) {
       if (a) { st.currency = a.currency; amountCtl && amountCtl.setCurrency(a.currency); }
       draw();
     });
-    kids.push(field(st.group === 'transfer' ? 'Từ tài khoản' : 'Tài khoản', accSel));
+    // Thiếu tài khoản (ví dụ vừa mở thêm thẻ BIDV)? Tạo ngay tại đây, không phải thoát ra.
+    const newAccBtn = (onPick) => h('button', { type: 'button', class: 'btn small', onclick: () => openAccountForm(null, { onSaved: onPick }) }, '＋ Tài khoản mới');
+    kids.push(field(st.group === 'transfer' ? 'Từ tài khoản' : 'Tài khoản',
+      h('div', { class: 'row-inline' }, accSel, newAccBtn((d) => { st.accountId = d.id; st.currency = d.currency; draw(); }))));
 
     if (st.group === 'transfer') {
-      kids.push(field('Sang tài khoản', select(accountOptions({ none: '— Chọn —' }), st.toAccountId, (v) => { st.toAccountId = v; draw(); })));
+      kids.push(field('Sang tài khoản', h('div', { class: 'row-inline' },
+        select(accountOptions({ none: '— Chọn —' }), st.toAccountId, (v) => { st.toAccountId = v; draw(); }),
+        newAccBtn((d) => { st.toAccountId = d.id; draw(); }))));
     }
 
     const a = acc();
@@ -291,8 +297,8 @@ const itemOk = (it) => !it.error && !it.mismatch && planOf(it).ok;
 
 export function openQuickAdd(initialText = '') {
   if (!store.all('accounts').length) {
-    toast('Hãy tạo ít nhất một tài khoản trước.', 'error');
-    location.hash = '#/accounts';
+    toast('Chưa có tài khoản nào — tạo tài khoản đầu tiên nhé.');
+    openAccountForm(null, { onSaved: () => openQuickAdd(initialText) });
     return null;
   }
   const st = { text: initialText, accountId: lsGet('qltc:lastAccount') || (accountOptions()[0] || {}).value || '', date: todayStr(), items: [] };

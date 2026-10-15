@@ -80,7 +80,19 @@ Icon app là logo QLTC (nền chàm; Q và C chồng lên nhau, L và T chung m�
 
 Đây là bản **debug** (đủ dùng cho cá nhân, không đưa lên Google Play).
 
-**Cài bản mới đè bản cũ:** mỗi lần dựng, GitHub tạo một chữ ký khác nhau, nên Android sẽ không cho cài đè. Cách đơn giản: gỡ app cũ rồi cài bản mới (dữ liệu nằm trên Supabase nên không mất gì, chỉ phải đăng nhập lại). Muốn cài đè được: tạo một khóa ký cố định một lần theo hướng dẫn trong chú thích của `.github/workflows/android.yml` rồi lưu vào secret `DEBUG_KEYSTORE_BASE64`.
+### Khi nào cần dựng lại APK, khi nào không
+
+- **Không cần APK mới:** thêm/sửa tài khoản ngân hàng, người vay, danh mục, giao dịch… Tất cả là *dữ liệu* nhập ngay trong app (trên điện thoại hay web), lưu vào Supabase, hiện ngay ở mọi thiết bị. Ví dụ mở thêm thẻ BIDV: **Tài khoản → ＋ Thêm**, hoặc bấm **＋ Tài khoản mới** ngay trong form giao dịch.
+- **Cần APK mới:** chỉ khi *mã* của app thay đổi (thêm tính năng, sửa lỗi giao diện), vì app Android đóng gói sẵn bản sao thư mục `web/` tại thời điểm dựng. Bản web trên GitHub Pages thì tự cập nhật sau mỗi lần đẩy mã.
+
+### Cài bản mới đè bản cũ (không phải gỡ app)
+
+Android chỉ cho cài đè khi bản mới được ký bằng **cùng một khóa** với bản cũ, và số phiên bản không nhỏ hơn. Workflow đã lo hai việc này:
+
+- **Số phiên bản** tự tăng theo số lần chạy workflow (`1.0.<số lần chạy>`).
+- **Khóa ký cố định:** đặt khóa vào secret `DEBUG_KEYSTORE_BASE64` (Settings → Secrets and variables → Actions → New repository secret). Cách tạo khóa nằm trong chú thích của `.github/workflows/android.yml`. Khóa chỉ cần tạo **một lần** và phải cất ở nơi an toàn **ngoài kho mã** (kho này công khai). Mất khóa thì lần cài sau lại phải gỡ app một lần.
+
+Nếu chưa có secret này, mỗi lần dựng GitHub tự sinh một khóa tạm khác nhau nên Android từ chối cài đè: lúc đó phải gỡ app cũ rồi cài bản mới (dữ liệu nằm trên Supabase nên không mất, chỉ cần đăng nhập lại). Lần cài đầu tiên sau khi đặt khóa cố định vẫn phải gỡ bản cũ một lần; từ các bản sau là cài đè bình thường.
 
 ---
 

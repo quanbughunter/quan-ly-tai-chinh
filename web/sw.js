@@ -1,6 +1,6 @@
 // Service worker: mở được khi mất mạng. Ưu tiên mạng (luôn lấy bản mới nhất), rơi về bản lưu khi không có mạng.
 // Chỉ xử lý tệp cùng nguồn; các yêu cầu tới Supabase đi thẳng, không bao giờ bị lưu.
-const CACHE = 'qltc-v7';
+const CACHE = 'qltc-v8';
 const ASSETS = [
   './', 'index.html', 'config.js', 'manifest.webmanifest', 'css/app.css',
   'vendor/supabase.js', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
