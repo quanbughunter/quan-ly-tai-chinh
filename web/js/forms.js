@@ -7,7 +7,7 @@ import { todayStr } from './dates.js';
 import { accountBalances, debtBalances, DEBT_SIGN } from './calc.js';
 import { parseQuick } from './quickadd.js';
 import { fmtMoney, fmtNum, parseExpr, impliedRate, CUR_INFO } from './money.js';
-import { planShare, buildShareTxs, describeShare } from './share.js';
+import { planShare, buildShareTxs, describeShare, planSendHome, buildSendHomeTx, describeSendHome } from './share.js';
 import { requestOpenDeal } from './deals.js';
 import { requestOpenScholarship, SCHOLARSHIP_NAME } from './scholarship.js';
 
@@ -293,49 +293,67 @@ function planOf(it) {
   if (Object.keys(d.bad).length) return { ok: false, error: 'Có ô số tiền chưa đọc được.', shares: {}, myShare: 0 };
   return planShare({ mode: d.mode, amount: it.amount, currency: it.currency, partyIds: d.partyIds, includeMe: d.includeMe, manual: d.manual });
 }
-const itemOk = (it) => !it.error && !it.mismatch && planOf(it).ok;
+// Khoản thu (lương, học bổng…) không chia nợ; thay vào đó có thể "gửi cho bố": ghi thêm một khoản chi
+// (Biếu gia đình) từ cùng tài khoản. Nhớ lựa chọn lần trước theo danh mục (lương thường gửi, học bổng thì không).
+const HOME_NAME = 'bố';
+const homeKey = (categoryId) => `qltc:homeSend:${categoryId || ''}`;
+const newHome = (on = false) => ({ on, manual: null, bad: false });
+function homePlanOf(it) {
+  const hm = it.home;
+  if (it.kind !== 'income' || !hm || !hm.on) return { ok: true, amount: 0, keep: 0 };
+  if (hm.bad) return { ok: false, error: 'Ô số tiền gửi chưa đọc được.', amount: 0, keep: 0 };
+  return planSendHome({ amount: it.amount, sendAmount: hm.manual, currency: it.currency });
+}
+const itemOk = (it) => !it.error && !it.mismatch && planOf(it).ok && homePlanOf(it).ok;
 
-export function openQuickAdd(initialText = '') {
+/** income=true: mở thẳng ở chế độ nhập khoản thu (không cần gõ dấu "+"). */
+export function openQuickAdd(initialText = '', { income = false } = {}) {
   if (!store.all('accounts').length) {
     toast('Chưa có tài khoản nào — tạo tài khoản đầu tiên nhé.');
-    openAccountForm(null, { onSaved: () => openQuickAdd(initialText) });
+    openAccountForm(null, { onSaved: () => openQuickAdd(initialText, { income }) });
     return null;
   }
   const st = { text: initialText, accountId: lsGet('qltc:lastAccount') || (accountOptions()[0] || {}).value || '', date: todayStr(), items: [] };
-  const ta = h('textarea', { rows: 3, placeholder: 'cafe 25k, ăn trưa 45k; +lương 10,9tr; grab 38k', value: initialText });
+  const ta = h('textarea', { rows: 3, placeholder: income ? 'lương 11tr; thưởng 2tr; làm thêm 500k' : 'cafe 25k, ăn trưa 45k; +lương 10,9tr; grab 38k', value: initialText });
   const list = h('div', { class: 'qa-list' });
   const info = h('p', { class: 'field-hint' });
   const catByName = (name, type) => store.all('categories').find((c) => c.type === type && c.name === name);
   const nameOf = (id) => (partyById(id) || {}).name || '?';
 
   const body = h('div', { class: 'form' },
-    field('Gõ nhiều khoản, ngăn bằng dấu phẩy, chấm phẩy hoặc xuống dòng', ta,
-      'Thêm "+" ở đầu cho khoản thu. Gắn đơn vị: 12 usd, 300 rub. Mua đồ ăn cho người khác: chọn “Cộng nợ” ở khoản đó.'),
+    field(income ? 'Gõ các khoản thu, ngăn bằng dấu phẩy, chấm phẩy hoặc xuống dòng' : 'Gõ nhiều khoản, ngăn bằng dấu phẩy, chấm phẩy hoặc xuống dòng', ta,
+      income
+        ? 'Gắn đơn vị: 12 usd, 300 rub. Mỗi khoản thu có thể chọn “Gửi cho bố” ở bên dưới.'
+        : 'Thêm "+" ở đầu cho khoản thu. Gắn đơn vị: 12 usd, 300 rub. Mua đồ ăn cho người khác: chọn “Cộng nợ” ở khoản đó.'),
     h('div', { class: 'grid2' },
       field('Tài khoản', select(accountOptions(), st.accountId, (v) => { st.accountId = v; parse(); })),
       field('Ngày', h('input', { type: 'date', value: st.date, onchange: (e) => { st.date = e.target.value; } }))),
     info, list);
 
   const saveBtn = h('button', { class: 'btn primary', onclick: onSave }, 'Lưu tất cả');
-  const m = modal({ title: 'Nhập nhanh', body, actions: [h('button', { class: 'btn ghost', onclick: () => m.close() }, 'Hủy'), saveBtn], wide: true });
+  const m = modal({ title: income ? 'Thêm khoản thu' : 'Nhập nhanh', body, actions: [h('button', { class: 'btn ghost', onclick: () => m.close() }, 'Hủy'), saveBtn], wide: true });
 
   function parse() {
     const acc = accById(st.accountId);
-    const parsed = parseQuick(ta.value, { defaultCurrency: acc ? acc.currency : 'VND' });
+    const parsed = parseQuick(ta.value, { defaultCurrency: acc ? acc.currency : 'VND', defaultKind: income ? 'income' : 'expense' });
     // Gõ thêm chữ thì các khoản cũ giữ nguyên lựa chọn (danh mục, ghi chú, người chia nợ).
     const prev = new Map();
     for (const it of st.items) if (!it.error) prev.set(it.raw, [...(prev.get(it.raw) || []), it]);
     st.items = parsed.map((p) => {
       if (p.error) return p;
       const old = (prev.get(p.raw) || []).shift();
-      const cat = p.categoryName ? catByName(p.categoryName, p.kind) : null;
+      // Khoản thu không đoán ra nguồn → "Thu khác" (đổi lại được ở ô danh mục) để mục Thu nhập không bị "chưa phân loại".
+      const cat = p.categoryName ? catByName(p.categoryName, p.kind) : (p.kind === 'income' ? catByName('Thu khác', 'income') : null);
       const debt = old ? old.debt : newDebt();
       if (old && old.currency !== p.currency) { debt.manual = {}; debt.bad = {}; } // đổi tiền tệ → bỏ số nhập tay
+      const home = old && old.home ? old.home : newHome(p.kind === 'income' && lsGet(homeKey(cat ? cat.id : '')) === '1');
+      if (old && old.currency !== p.currency) { home.manual = null; home.bad = false; }
       return {
         ...p,
         note: old ? old.note : p.note,
         categoryId: old ? old.categoryId : (cat ? cat.id : ''),
         debt,
+        home,
         mismatch: acc && p.currency !== acc.currency,
       };
     });
@@ -356,7 +374,58 @@ export function openQuickAdd(initialText = '') {
     refreshInfo();
   }
 
+  /** Khoản thu: không có phần chia nợ; chỉ hỏi có gửi cho bố hay không. */
+  function buildIncomeItem(it) {
+    const hm = it.home;
+    const item = h('div', { class: 'qa-item' });
+    const catSel = select(categoryOptions('income', '—'), it.categoryId, (v) => { it.categoryId = v; }, { 'aria-label': 'Danh mục' });
+    item.append(h('div', { class: 'qa-row' },
+      h('span', { class: 'chip good' }, 'Thu'),
+      h('input', { type: 'text', value: it.note, 'aria-label': 'Ghi chú', oninput: (e) => { it.note = e.target.value; } }),
+      h('strong', { class: 'mono' }, fmtMoney(it.amount, it.currency)),
+      catSel,
+      it.mismatch ? h('span', { class: 'chip bad' }, `≠ ${(accById(st.accountId) || {}).currency}`) : null,
+      h('button', { class: 'icon-btn', 'aria-label': 'Bỏ khoản này', onclick: () => { st.items.splice(st.items.indexOf(it), 1); drawList(); } }, '✕')));
+    if (it.mismatch) { item.classList.add('bad'); return item; }
+
+    const summary = h('p', { class: 'field-hint' });
+    const input = h('input', {
+      type: 'text', inputmode: 'decimal', autocomplete: 'off', placeholder: 'Để trống = gửi cả khoản', 'aria-label': `Số tiền gửi ${HOME_NAME}`,
+      value: hm.manual != null ? String(hm.manual) : '',
+      oninput: (e) => {
+        const t = e.target.value.trim();
+        const r = t ? parseExpr(t) : null;
+        hm.bad = !!t && !(r && r.total > 0);
+        hm.manual = t && !hm.bad ? r.total : null;
+        e.target.classList.toggle('bad', hm.bad);
+        sync();
+      },
+    });
+    const panel = h('div', { class: 'qa-share' },
+      h('label', { class: 'qa-amt' },
+        h('span', { class: 'qa-who' }, h('b', {}, `Số tiền gửi ${HOME_NAME}`), h('span', { class: 'sub' }, 'để trống = gửi cả khoản')),
+        input, h('span', { class: 'qa-cur mono' }, (CUR_INFO[it.currency] || {}).symbol || it.currency)),
+      summary);
+    item.append(
+      h('div', { class: 'qa-share-bar' },
+        h('span', { class: 'sub' }, 'Sau khi nhận'),
+        seg([{ value: 'keep', label: 'Giữ lại' }, { value: 'send', label: `Gửi cho ${HOME_NAME}` }], hm.on ? 'send' : 'keep', (v) => { hm.on = v === 'send'; sync(); })),
+      panel);
+
+    function sync() {
+      const plan = homePlanOf(it);
+      panel.hidden = !hm.on;
+      item.classList.toggle('bad', hm.on && !plan.ok);
+      summary.textContent = hm.on ? describeSendHome({ plan, currency: it.currency, toName: HOME_NAME }) : '';
+      summary.classList.toggle('bad', hm.on && !plan.ok);
+      refreshInfo();
+    }
+    sync();
+    return item;
+  }
+
   function buildItem(it) {
+    if (it.kind === 'income') return buildIncomeItem(it);
     const d = it.debt;
     const item = h('div', { class: 'qa-item' });
     const kindChip = h('span', { class: 'chip' });
@@ -511,11 +580,21 @@ export function openQuickAdd(initialText = '') {
     const docs = [];
     let n = 0;
     let shared = 0;
+    let sent = 0;
     let lastPeople = null;
+    const familyCat = catByName('Biếu gia đình', 'expense');
     for (const i of ok) {
       const ts = () => Date.now() + (n += 1);
       if (i.debt.mode === 'none') {
         docs.push({ date: st.date, kind: i.kind, amount: i.amount, currency: acc.currency, accountId: acc.id, categoryId: i.categoryId || '', note: i.note, ts: ts() });
+        if (i.kind === 'income') {
+          const hp = homePlanOf(i);
+          if (i.home && i.home.on && hp.ok) {
+            docs.push({ ...buildSendHomeTx({ date: st.date, amount: hp.amount, currency: acc.currency, accountId: acc.id, categoryId: familyCat ? familyCat.id : '', note: i.note, toName: HOME_NAME }), ts: ts() });
+            sent += 1;
+          }
+          lsSet(homeKey(i.categoryId), i.home && i.home.on ? '1' : '0');
+        }
       } else {
         const plan = planOf(i);
         for (const t of buildShareTxs({ mode: i.debt.mode, plan, date: st.date, currency: acc.currency, accountId: acc.id, note: i.note, categoryId: i.categoryId, nameOf })) docs.push({ ...t, ts: ts() });
@@ -528,7 +607,8 @@ export function openQuickAdd(initialText = '') {
       lsSet('qltc:lastAccount', acc.id);
       if (lastPeople) lsSet(SHARE_PEOPLE_KEY, JSON.stringify(lastPeople));
       m.close();
-      toast(shared ? `Đã lưu ${docs.length} giao dịch (${shared} khoản gắn với Vay nợ).` : `Đã lưu ${docs.length} giao dịch.`, 'ok');
+      const extra = [shared ? `${shared} khoản gắn với Vay nợ` : '', sent ? `${sent} khoản gửi ${HOME_NAME}` : ''].filter(Boolean).join(', ');
+      toast(`Đã lưu ${docs.length} giao dịch${extra ? ` (${extra})` : ''}.`, 'ok');
     } catch (e) { toast(errMsg(e), 'error'); }
   }
 

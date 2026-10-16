@@ -494,3 +494,5 @@ a.row:hover, button.row:hover { background: var(--surface-2); text-decoration: n
 .banner.pending-post select { flex: 1 1 160px; min-width: 0; }
 .confirm-box { padding: 12px 14px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); }
 .deal-foot { flex-wrap: wrap; }
+
+.links { display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }

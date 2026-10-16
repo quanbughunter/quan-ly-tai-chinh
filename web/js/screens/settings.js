@@ -68,8 +68,8 @@ export function render(root) {
       numRow('Lãi mặc định chiều Sang (₫/lô)', P.defaultMarginSang, setP('defaultMarginSang'), { cur: 'VND' }),
       numRow('Lãi mặc định chiều Về (₫/lô)', P.defaultMarginVe, setP('defaultMarginVe'), { cur: 'VND' }),
       numRow('Số ₫ tham chiếu để quy ra ₽', P.refVnd, setP('refVnd'), { cur: 'VND', hint: 'Dòng “… ₫ tương đương … ₽” trong máy tính báo giá.' })),
-    field('Thẻ nhận lãi khi chốt giao dịch', select(accountOptions({ none: '— Hỏi mỗi lần chốt —', only: (a) => a.currency === 'VND' }), P.dealAccountId, (v) => save(() => store.saveSettings({ params: { dealAccountId: v } }))),
-      'Khi bạn bấm “Chốt giao dịch” ở mục Báo tỉ giá, lãi thực được cộng vào thẻ này, đúng ngày của lệnh. Báo giá mà chưa chốt thì không cộng gì.'))));
+    field('Thẻ nhận lãi mặc định khi chốt giao dịch', select(accountOptions({ none: '— Nhớ thẻ lần chốt trước —' }), P.dealAccountId, (v) => save(() => store.saveSettings({ params: { dealAccountId: v } }))),
+      'Khi bạn bấm “Chốt giao dịch” ở mục Báo tỉ giá, lãi thực được cộng vào thẻ gợi ý sẵn, đúng ngày của lệnh; thẻ VND hay thẻ rúp đều được (thẻ rúp thì lãi quy đổi theo tỉ giá áng chừng bạn nhập khi chốt). Mỗi lần chốt bạn vẫn chọn lại được thẻ khác. Để “Nhớ thẻ lần chốt trước” thì app gợi ý đúng thẻ bạn vừa chọn lần trước. Báo giá mà chưa chốt thì không cộng gì.'))));
 
   /* ── Học bổng MIIGAiK ── */
   root.append(card('Học bổng MIIGAiK', h('div', { class: 'form' },

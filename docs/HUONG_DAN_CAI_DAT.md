@@ -99,10 +99,16 @@ Nếu chưa có secret này, mỗi lần dựng GitHub tự sinh một khóa t�
 ## Dùng hằng ngày
 
 - **Thêm nhanh:** ô "Nhập nhanh" ở Tổng quan, ví dụ `cafe 25k, ăn trưa 45k; +lương 10tr`. App tách từng khoản, tự đoán danh mục và cho bạn xem lại trước khi lưu.
+  - Khoản **chi** có thể chia cho người trong Vay nợ (Cộng nợ / Trừ nợ) khi bạn mua hộ.
+  - Khoản **thu** (có dấu `+`) có lựa chọn **Giữ lại / Gửi cho bố**. Chọn gửi thì app ghi thêm một khoản chi «Gửi bố» (danh mục Biếu gia đình) từ cùng thẻ; để trống số tiền là gửi cả khoản, hoặc gõ một phần (ví dụ `8tr`). App nhớ lựa chọn lần trước theo từng loại thu (lương / học bổng…).
+- **Thu nhập:** mục riêng (thanh bên; trên điện thoại ở **Khác → Thu nhập**) gom mọi khoản bạn kiếm được: lương, học bổng, lãi đổi tiền… theo tháng, lọc theo thẻ và nguồn thu. Nút **＋ Thêm khoản thu** ở đó mở thẳng form nhập khoản thu (không cần gõ `+`).
+- **Đổi tên «Sổ chi tiêu & lương (chỉ ghi lại)»:** đó là một tài khoản trong dữ liệu của bạn, nên đổi ngay trong app: **Tài khoản** → bấm vào tài khoản đó → sửa ô **Tên** thành «Sổ chi tiêu» → Lưu. Không cần dựng lại APK.
 - **Báo tỉ giá (khách đổi RUB↔VND):** nhập giá và số tiền khách đưa → app tính giá báo, số tiền phải trả và lãi dự kiến.
   - Khách chỉ hỏi giá: bấm **Lưu báo giá** — chưa tính lãi, số dư không đổi (lệnh nằm ở "Chờ chốt").
   - Giao dịch thật sự xảy ra: bấm **✓ Chốt giao dịch** (hoặc nút *Chốt* ở lệnh đã lưu), điền giá thực tế nếu có → app ghi **một khoản thu = lãi vào thẻ MB đúng ngày giao dịch**. Hủy chốt hoặc xóa lệnh thì khoản lãi tự gỡ.
-  - Thẻ nhận lãi và các tham số (cỡ lô, lãi mặc định) chỉnh ở **Cài đặt**.
+  - Ở hộp chốt, ô **Thẻ nhận lãi** cho chọn bất kỳ thẻ nào (thẻ MB, thẻ rúp, thẻ của người khác…) riêng cho lệnh đó; chưa có thẻ thì bấm **＋ Thẻ mới** ngay tại đó. Thẻ gợi ý sẵn là thẻ đặt ở **Cài đặt**, hoặc (nếu Cài đặt để «Nhớ thẻ lần chốt trước») thẻ bạn chọn ở lần chốt trước.
+  - **Thẻ rúp:** chọn thẻ rúp thì hiện thêm ô **Tỉ giá áng chừng** (₫ cho 1 ₽, app điền sẵn theo giá báo của lệnh; sửa lại nếu muốn). Ở mục **Lãi ghi nhận** bạn bấm **₫ VND** hoặc **₽ RUB** để chọn nhập lãi bằng đơn vị nào; dòng nhỏ bên dưới cho thấy số tiền sẽ cộng vào thẻ (ví dụ «Lãi tính ra +330.000 ₫ · cộng +1.000 ₽ vào thẻ …»). Lãi trong thống kê vẫn tính bằng ₫.
+  - Các tham số khác (cỡ lô, lãi mặc định) cũng chỉnh ở **Cài đặt**.
 - **Chuyển tiền / đổi tiền** giữa tài khoản (kể cả khác loại tiền) ở nút **Chuyển / đổi**: ghi số tiền ra và số tiền vào, app tự tính tỷ giá thực tế.
 - **Khớp số dư:** ở **Tài khoản**, bấm "Khớp số dư" khi số trong ngân hàng khác số trong app; app tạo một dòng điều chỉnh có ghi chú thay vì sửa lịch sử.
 - **Sao lưu:** **Cài đặt → Dữ liệu → Xuất sao lưu** (file JSON) thỉnh thoảng một lần. File này chứa dữ liệu thật, đừng đưa vào git.

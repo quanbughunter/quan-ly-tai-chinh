@@ -39,7 +39,7 @@ const CFG = {
     bo: { name: 'Gửi bố (tiết kiệm)', kind: 'savings', currency: 'VND', networth: true },
     bank: { name: 'Tiết kiệm RUB (bank)', kind: 'savings', currency: 'RUB', networth: true },
     usd: { name: 'Tiền mặt USD', kind: 'cash', currency: 'USD', networth: true },
-    legacy: { name: 'Sổ chi tiêu & lương (chỉ ghi lại)', kind: 'cash', currency: 'VND', networth: false },
+    legacy: { name: 'Sổ chi tiêu', kind: 'cash', currency: 'VND', networth: false },
   },
 };
 /* ═════════════════════════════════════════════════════════════ */

@@ -142,6 +142,36 @@ export function periodStats(txs, { from, to }, rates) {
   return { income, expense, net: income - expense, cats, missing: [...missing] };
 }
 
+/**
+ * Các khoản thu (kind 'income': lương, học bổng, lãi đổi tiền…) trong khoảng ngày; lọc thêm theo tài khoản /
+ * danh mục. Không tính nhận trả nợ hay đi vay (đó không phải tiền kiếm được).
+ * Trả: tổng quy ra VND, số khoản, tổng theo từng tiền tệ gốc, tổng theo danh mục (quy VND, lớn → nhỏ).
+ */
+export function incomeStats(txs, { from, to, accountId = '', categoryId = '' } = {}, rates) {
+  let total = 0;
+  let count = 0;
+  const byCur = {};
+  const byCat = new Map();
+  const missing = new Set();
+  for (const t of txs) {
+    if (t.kind !== 'income') continue;
+    if (from && t.date < from) continue;
+    if (to && t.date > to) continue;
+    if (accountId && t.accountId !== accountId) continue;
+    if (categoryId && t.categoryId !== categoryId) continue;
+    count += 1;
+    const cur = t.currency || 'VND';
+    addTo(byCur, cur, Number(t.amount) || 0);
+    const b = toBase(t.amount, cur, rates);
+    if (b == null) { missing.add(cur); continue; }
+    total += b;
+    const k = t.categoryId || '_none';
+    byCat.set(k, (byCat.get(k) || 0) + b);
+  }
+  const cats = [...byCat.entries()].map(([id, amount]) => ({ categoryId: id, amount })).sort((a, b) => b.amount - a.amount);
+  return { total, count, byCur, cats, missing: [...missing] };
+}
+
 /** Chuỗi thu/chi theo tháng, kết thúc ở endMonth ('YYYY-MM'). */
 export function monthlySeries(txs, endMonth, count, rates) {
   const months = lastMonths(endMonth, count);

@@ -11,7 +11,7 @@ Từ Google Sheet + Apps Script → web app (GitHub Pages) + APK Android, dữ l
 | Nhóm | Các tab | Bản chất | Trong app mới |
 |---|---|---|---|
 | Sổ cá nhân | `cá nhân` (3 thẻ), `bố`, `mẹ`, `học bổng miigaik` | Thu chi và số dư của chính bạn | Có |
-| | `tiêu sài`, `lương sĩ quan` | Ghi lại khoản chi / khoản lương theo ngày | Có, chỉ ghi lại theo ngày (không tính vào tổng tài sản) |
+| | `tiêu sài`, `lương sĩ quan` | Ghi lại khoản chi / khoản lương theo ngày | Có, vào tài khoản «Sổ chi tiêu» chỉ ghi lại theo ngày (không tính vào tổng tài sản) |
 | | `vnd` | Sổ MBBank cũ | **Bỏ** |
 | Vay nợ | `cho vay` (5 người) | Khoản phải thu theo từng người | Có |
 | | 2 tab công nợ ăn chung | Tự đồng bộ sang một sheet riêng, đã chia sẻ cho những người liên quan | **Bỏ** (giữ nguyên ở sheet riêng) |
@@ -130,7 +130,14 @@ Nhiều khách chỉ hỏi giá rồi không giao dịch, nên **báo giá khôn
 
 - Lãi ghi nhận = lãi thực tính từ giá thực tế (điền khi chốt); nếu chưa có giá thực tế thì lấy lãi theo giá báo (`sang`: VND × lãi ÷ cỡ lô; `về`: RUB × lãi ÷ cỡ lô). Bạn luôn sửa được số này. Lãi âm (lỗ) được ghi thành một khoản chi.
 - Khoản lãi trong sổ gắn với lệnh qua `dealId`/`profitTxId`: **sửa** lệnh thì khoản lãi tự cập nhật, **hủy chốt** hoặc **xóa** lệnh thì khoản lãi tự biến mất, số dư luôn khớp. Khoản này không sửa tay ở màn hình Giao dịch (app dẫn bạn về lệnh gốc).
-- Thẻ nhận lãi chọn trong Cài đặt; để trống thì app mặc định thẻ VND có tên chứa "MB", hoặc cho chọn mỗi lần chốt. Có thể bỏ tick "Cộng lãi vào thẻ" cho từng lệnh.
+- **Thẻ nhận lãi** là tùy chọn của từng lệnh: hộp «Chốt giao dịch» có ô chọn **bất kỳ thẻ nào** (thẻ MB, thẻ rúp, thẻ của người khác…) và nút «＋ Thẻ mới» để tạo thẻ ngay tại đó. Thẻ được gợi ý sẵn theo thứ tự: thẻ đặt trong Cài đặt → thẻ bạn chọn ở lần chốt trước (nhớ trên máy này; chỉ khi Cài đặt để «Nhớ thẻ lần chốt trước») → thẻ VND có tên chứa "MB" → thẻ VND đầu tiên → thẻ bất kỳ. Có thể bỏ tick "Cộng lãi vào thẻ" cho từng lệnh.
+- **Lãi theo đơn vị và tỉ giá áng chừng.** Lãi của lệnh (`deal.profit`) luôn lưu bằng **VND** để thống kê, nhưng khi chốt bạn chọn được đơn vị nhập lãi (₫ hoặc ₽/ngoại tệ của thẻ) và, khi cần quy đổi, điền **tỉ giá áng chừng** (₫ cho 1 đơn vị ngoại tệ):
+  - Thẻ VND + nhập bằng ₫: không cần tỉ giá (như trước).
+  - Thẻ rúp (hoặc ngoại tệ khác) + nhập bằng ₫: số vào thẻ = lãi ₫ ÷ tỉ giá, làm tròn 2 số lẻ.
+  - Nhập thẳng bằng ₽: lãi VND = số ₽ × tỉ giá (để thống kê); số vào thẻ rúp đúng bằng số ₽ đã nhập. Nhập bằng ₽ rồi nhận vào thẻ VND thì số vào thẻ = lãi VND quy đổi.
+  - Tỉ giá gợi ý sẵn: rúp → **giá báo của chính lệnh** (₫/₽), không có thì tỉ giá trong Cài đặt; ngoại tệ khác → tỉ giá trong Cài đặt. Sửa tay thì app giữ số bạn nhập. Đơn vị và tỉ giá đã dùng được lưu vào lệnh (`profitUnit`, `profitRate`), và tỉ giá ghi vào ghi chú khoản lãi để truy lại. Lỗ (âm) thành khoản chi bằng tiền của thẻ.
+  - Hàm thuần `convertProfit` (deals.js) làm phép quy đổi; `saveDeal` nhận thêm `cardAmount` (số tiền theo tiền của thẻ) và tự quy đổi từ `profit` + `profitRate` nếu thiếu.
+  - Cộng bù hàng loạt (lệnh cũ nhập từ sheet) chỉ dùng thẻ VND, vì lãi các lệnh cũ chỉ có số ₫ (muốn vào thẻ rúp thì mở từng lệnh và chốt lại).
 - Các lệnh cũ nhập từ sheet được đánh dấu **đã chốt nhưng chưa cộng vào thẻ** (số dư MB trong sheet cũ chưa từng có các khoản này). App hiện một thông báo để bạn chọn **cộng bù** (mỗi lệnh một khoản thu đúng ngày) hoặc **bỏ qua**.
 
 ### Học bổng MIIGAiK → cộng vào thẻ ₽
@@ -149,7 +156,7 @@ Mỗi tháng một dòng, mặc định **15.000 ₽** (đổi được trong C�
 
 ### Nhập nhanh ↔ Vay nợ (mình là thủ quỹ mua đồ ăn cho nhiều người)
 
-Mỗi khoản trong «Nhập nhanh» có thanh **Chia cho người trong Vay nợ**: `Không chia` (như cũ) · `Cộng nợ` · `Trừ nợ`. Chọn người bằng ô tick (danh sách đúng như màn hình Vay nợ), hoặc «＋ Thêm người» ngay trong hộp thoại.
+Mỗi **khoản chi** trong «Nhập nhanh» có thanh **Chia cho người trong Vay nợ**: `Không chia` (như cũ) · `Cộng nợ` · `Trừ nợ`. (**Khoản thu** không có thanh này, xem «Khoản thu và gửi bố» ngay dưới.) Chọn người bằng ô tick (danh sách đúng như màn hình Vay nợ), hoặc «＋ Thêm người» ngay trong hộp thoại.
 
 | Chế độ | Ý nghĩa | Ghi vào sổ |
 |---|---|---|
@@ -160,6 +167,15 @@ Mỗi khoản trong «Nhập nhanh» có thanh **Chia cho người trong Vay n�
 - Mỗi người hiện «đang nợ mình / mình đang nợ / hiện chưa nợ» (theo tiền tệ của khoản) và dòng tóm tắt tác động lên tài khoản trước khi lưu. Phần chia sai (không chọn ai, vượt tổng, thiếu) hiện màu đỏ và **không được lưu**.
 - Nhớ người và lựa chọn «Tính cả phần của mình» của lần trước; nút «Dùng cho tất cả khoản» áp cùng cách chia cho mọi khoản đang nhập. Mỗi giao dịch tạo ra là giao dịch thường (không liên kết với nhau), sửa/xóa riêng ở Giao dịch hoặc trong trang của người đó ở Vay nợ.
 - Logic chia nằm ở `web/js/share.js` (hàm thuần, kiểm thử trong `tests/share.test.js`).
+
+### Khoản thu và «Gửi cho bố»; mục Thu nhập
+
+- Khoản thu trong «Nhập nhanh» (gõ `+lương 11tr`, hoặc mở bằng **Thêm → Khoản thu** / nút «＋ Thêm khoản thu» ở mục Thu nhập, khi đó không cần dấu `+`) có thanh **Sau khi nhận**: `Giữ lại` · `Gửi cho bố`. Chọn «Gửi cho bố» thì nhập số tiền gửi (để trống = gửi cả khoản; không được vượt khoản thu).
+- Khoản gửi ghi thành **một khoản chi riêng** (`expense`, danh mục «Biếu gia đình», ghi chú «Gửi bố · lương») trừ vào **cùng tài khoản** đã nhận khoản thu. Nhờ vậy số dư thẻ luôn đúng, và tiền gửi bố thấy được trong thống kê chi. Khoản thu vẫn nguyên số tiền để mục Thu nhập phản ánh đúng thu nhập kiếm được. Không tạo công nợ với bố.
+- App nhớ lựa chọn lần trước **theo danh mục** (lương thường gửi, học bổng thì không) trên máy này; mỗi lần vẫn thấy rõ đang chọn gì và đổi được.
+- Khoản thu không đoán ra nguồn được xếp vào «Thu khác».
+- Mục **Thu nhập** (thanh bên; trên điện thoại ở «Khác», và liên kết ở thẻ tháng trong Tổng quan) liệt kê mọi giao dịch `income` của **mọi tài khoản** (kể cả «Sổ chi tiêu» lưu lương cũ), theo tháng hoặc toàn bộ thời gian, lọc theo tài khoản / nguồn thu, kèm tổng quy VND, tổng theo nguồn và theo từng tiền tệ gốc. Nhận trả nợ, đi vay, chuyển khoản không phải thu nhập nên không có ở đây. Logic tính ở `incomeStats` trong `web/js/calc.js`.
+- Tên tài khoản lưu lịch sử chi tiêu / lương cũ nay là «Sổ chi tiêu» (công cụ nhập đặt tên này cho lần nhập sau). Dữ liệu đã nhập từ trước thì đổi tên ngay trong app: **Tài khoản → mở tài khoản → Tên**.
 
 ## 6. Ánh xạ từ sheet cũ
 
@@ -210,7 +226,7 @@ Logo **QLTC** vẽ bằng SVG (không dùng phông chữ): **Q** và **C** là h
 3. Các lệnh cũ chưa cộng lãi vào thẻ MB: chọn **cộng bù** hay **bỏ qua** (xem mục 5).
 4. Một lệnh `về` cũ có lãi bất thường (hàng chục triệu ₫, do giá thực tế chênh xa giá báo); báo cáo nhập có nêu dòng đó để bạn xem lại có gõ nhầm giá không.
 5. Các dòng `tiêu sài` không ghi ngày (đầu danh sách) được gán tạm một ngày cố định và ghi chú "(chưa rõ ngày)"; bạn sửa ngày trong app nếu nhớ.
-6. Tài khoản "Sổ chi tiêu & lương (chỉ ghi lại)" giữ lịch sử tiêu sài, lương… theo ngày, **không tính vào tổng tài sản**.
+6. Tài khoản "Sổ chi tiêu" (trước đây tên "Sổ chi tiêu & lương (chỉ ghi lại)") giữ lịch sử tiêu sài, lương… theo ngày, **không tính vào tổng tài sản**.
 7. Tổng tài sản trong app thấp hơn `tổng hợp`!O2 đúng bằng phần công nợ của hai sổ ăn chung không nhập (báo cáo nhập có dòng đối chiếu đã trừ phần này).
 
 ## 9. Việc ngoài phạm vi (làm sau nếu bạn muốn)

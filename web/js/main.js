@@ -7,6 +7,7 @@ import { openTxForm, openQuickAdd } from './forms.js';
 import { renderLogin } from './screens/login.js';
 import * as dashboard from './screens/dashboard.js';
 import * as transactions from './screens/transactions.js';
+import * as income from './screens/income.js';
 import * as accounts from './screens/accounts.js';
 import * as debts from './screens/debts.js';
 import * as exchange from './screens/exchange.js';
@@ -17,6 +18,7 @@ import * as settings from './screens/settings.js';
 const ROUTES = {
   home: { title: 'Tổng quan', icon: 'home', mod: dashboard },
   tx: { title: 'Giao dịch', icon: 'list', mod: transactions },
+  income: { title: 'Thu nhập', icon: 'brief', mod: income },
   accounts: { title: 'Tài khoản', icon: 'card', mod: accounts },
   debts: { title: 'Vay nợ', icon: 'users', mod: debts },
   fx: { title: 'Báo tỉ giá', icon: 'swap', mod: exchange },
@@ -24,7 +26,7 @@ const ROUTES = {
   scholarship: { title: 'Học bổng MIIGAiK', icon: 'cap', mod: scholarship },
   settings: { title: 'Cài đặt', icon: 'sliders', mod: settings },
 };
-const SIDE_ORDER = ['home', 'tx', 'accounts', 'debts', 'fx', 'dorm', 'scholarship', 'settings'];
+const SIDE_ORDER = ['home', 'tx', 'income', 'accounts', 'debts', 'fx', 'dorm', 'scholarship', 'settings'];
 const TAB_ORDER = ['home', 'tx', 'accounts', 'debts'];
 
 const ICON_PATHS = {
@@ -134,7 +136,7 @@ function openAddMenu() {
     title: 'Thêm mới',
     body: h('div', { class: 'menu' },
       item('－', 'Khoản chi', 'Ghi một khoản chi tiêu', () => openTxForm({ group: 'expense' })),
-      item('＋', 'Khoản thu', 'Lương, học bổng, tiền nhận…', () => openTxForm({ group: 'income' })),
+      item('＋', 'Khoản thu', 'Lương, học bổng, tiền làm thêm… (có thể gửi bố)', () => openQuickAdd('', { income: true })),
       item('✍️', 'Nhập nhanh nhiều khoản', 'Ví dụ: cafe 25k, ăn trưa 45k, +lương 10tr', () => openQuickAdd('')),
       item('⇄', 'Chuyển / đổi tiền', 'Giữa hai tài khoản, kể cả khác tiền tệ', () => openTxForm({ group: 'transfer' })),
       item('🤝', 'Vay nợ', 'Cho vay, nhận trả, đi vay, trả nợ', () => openTxForm({ group: 'debt' }))),

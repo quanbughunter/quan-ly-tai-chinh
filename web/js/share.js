@@ -99,6 +99,37 @@ export function buildShareTxs({ mode, plan, date, currency, accountId, note = ''
   return out;
 }
 
+/**
+ * Khoản thu rồi gửi một phần (hoặc cả khoản) cho người nhà — ví dụ lương vào thẻ MB, gửi bố.
+ * sendAmount trống / null = gửi cả khoản. Số gửi phải > 0 và không vượt khoản thu.
+ * @returns {{ ok: boolean, error?: string, amount: number, keep: number }}
+ */
+export function planSendHome({ amount, sendAmount = null, currency = 'VND' } = {}) {
+  const total = toUnits(amount, currency);
+  const fail = (error) => ({ ok: false, error, amount: 0, keep: 0 });
+  if (!(total > 0)) return fail('Số tiền không hợp lệ.');
+  const blank = sendAmount == null || sendAmount === '';
+  const u = blank ? total : toUnits(sendAmount, currency);
+  if (!Number.isFinite(u) || !(u > 0)) return fail('Số tiền gửi phải lớn hơn 0.');
+  if (u > total) return fail(`Số gửi vượt khoản thu (dư ${fmtMoney(fromUnits(u - total, currency), currency)}).`);
+  return { ok: true, amount: fromUnits(u, currency), keep: fromUnits(total - u, currency) };
+}
+
+/** Khoản chi ghi thêm khi gửi tiền cho người nhà (chưa có id). Trừ vào cùng tài khoản đã nhận khoản thu. */
+export function buildSendHomeTx({ date, amount, currency, accountId, categoryId = '', note = '', toName = 'bố' }) {
+  const base = String(note || '').trim();
+  return { date, kind: 'expense', amount, currency, accountId, categoryId: categoryId || '', note: `Gửi ${toName}${base ? ` · ${base}` : ''}` };
+}
+
+/** Câu tóm tắt cho khoản thu có gửi người nhà. */
+export function describeSendHome({ plan, currency, toName = 'bố' }) {
+  if (!plan || !plan.ok) return plan && plan.error ? plan.error : '';
+  const m = (v) => fmtMoney(v, currency);
+  return plan.keep > 0
+    ? `Gửi ${toName} ${m(plan.amount)}, giữ lại ${m(plan.keep)}. Phần gửi ghi thành một khoản chi (Biếu gia đình).`
+    : `Gửi ${toName} cả ${m(plan.amount)}. Khoản này ghi thành một khoản chi (Biếu gia đình), tài khoản về lại như trước khi nhận.`;
+}
+
 /** Câu tóm tắt tác động lên tài khoản + nợ, để người dùng kiểm tra trước khi lưu. */
 export function describeShare({ mode, amount, currency, plan, nameOf = (id) => id }) {
   if (!plan || !plan.ok) return plan && plan.error ? plan.error : '';

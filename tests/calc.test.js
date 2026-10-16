@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  accountBalances, debtBalances, overview, periodStats, monthlySeries, filterTxs, groupByDate, budgetStatus, toBase, accAmount,
+  accountBalances, debtBalances, overview, periodStats, monthlySeries, filterTxs, groupByDate, budgetStatus, toBase, accAmount, incomeStats,
 } from '../web/js/calc.js';
 
 const accounts = [
@@ -130,4 +130,37 @@ test('accountAmount trống / không hợp lệ thì dùng amount (khoản cùng
   assert.equal(accAmount({ amount: 7_800_000, accountAmount: 300 }), 300);
   const same = [{ id: 'x', date: '2026-10-15', kind: 'lend', amount: 100, currency: 'USD', accountId: 'vcb', partyId: 'p1', ts: 1 }];
   assert.equal(accountBalances(usdAccounts, same).get('vcb'), 2400);
+});
+
+test('incomeStats: chỉ tính kind income, quy VND, nhóm theo danh mục, lọc theo tài khoản / tháng', () => {
+  const txs = [
+    { id: '1', date: '2026-10-05', kind: 'income', amount: 11_000_000, currency: 'VND', accountId: 'mb', categoryId: 'luong' },
+    { id: '2', date: '2026-10-20', kind: 'income', amount: 15000, currency: 'RUB', accountId: 'gz', categoryId: 'hocbong' },
+    { id: '3', date: '2026-10-21', kind: 'income', amount: 500_000, currency: 'VND', accountId: 'mb', categoryId: '' },
+    { id: '4', date: '2026-10-22', kind: 'repay_in', amount: 9_000_000, currency: 'VND', accountId: 'mb', partyId: 'p' }, // nhận trả nợ: không phải thu nhập
+    { id: '5', date: '2026-10-23', kind: 'expense', amount: 100_000, currency: 'VND', accountId: 'mb' },
+    { id: '6', date: '2026-09-30', kind: 'income', amount: 1, currency: 'VND', accountId: 'mb', categoryId: 'luong' }, // tháng khác
+  ];
+  const r = incomeStats(txs, { from: '2026-10-01', to: '2026-10-31' }, rates);
+  assert.equal(r.count, 3);
+  assert.equal(r.total, 11_000_000 + 15000 * 300 + 500_000);
+  assert.deepEqual(r.byCur, { VND: 11_500_000, RUB: 15000 });
+  assert.deepEqual(r.cats.map((c) => c.categoryId), ['luong', 'hocbong', '_none']);
+  assert.equal(r.cats[1].amount, 4_500_000);
+  assert.deepEqual(r.missing, []);
+  const mb = incomeStats(txs, { from: '2026-10-01', to: '2026-10-31', accountId: 'mb' }, rates);
+  assert.equal(mb.count, 2);
+  assert.equal(mb.total, 11_500_000);
+  assert.equal(incomeStats(txs, { categoryId: 'luong' }, rates).count, 2); // không giới hạn ngày
+});
+
+test('incomeStats: thiếu tỷ giá thì báo thiếu và không cộng vào tổng', () => {
+  const r = incomeStats([
+    { date: '2026-10-05', kind: 'income', amount: 100, currency: 'USD', categoryId: 'x' },
+    { date: '2026-10-05', kind: 'income', amount: 1_000_000, currency: 'VND', categoryId: 'x' },
+  ], {}, { RUB: 300 });
+  assert.equal(r.total, 1_000_000);
+  assert.deepEqual(r.missing, ['USD']);
+  assert.equal(r.count, 2);
+  assert.deepEqual(r.byCur, { USD: 100, VND: 1_000_000 });
 });

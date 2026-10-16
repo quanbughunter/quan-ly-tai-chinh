@@ -67,7 +67,7 @@ export function render(root) {
     slices.length
       ? h('div', { class: 'donut-wrap' }, donut(slices), h('ul', { class: 'legend' }, slices.map((d) => h('li', {}, h('i', { style: { background: d.color } }), h('span', {}, d.label), h('b', { class: 'mono' }, money(d.value, 'VND', { compact: true }))))))
       : emptyState('Tháng này chưa có khoản chi nào.'));
-  root.append(card(monthLabel(month), monthBody, { right: h('a', { class: 'link', href: '#/tx' }, 'Xem giao dịch ›') }));
+  root.append(card(monthLabel(month), monthBody, { right: h('span', { class: 'links' }, h('a', { class: 'link', href: '#/income' }, 'Thu nhập ›'), ' ', h('a', { class: 'link', href: '#/tx' }, 'Giao dịch ›')) }));
 
   // Ngân sách
   const budgets = store.all('budgets');

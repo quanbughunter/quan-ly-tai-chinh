@@ -45,3 +45,19 @@ test('từ khóa ngắn không khớp nhầm', () => {
   assert.equal(guessCategoryName('xem phim'), 'Du lịch / giải trí'); // "xe" không khớp "xem"
   assert.equal(guessCategoryName('đi xe buýt'), 'Đi lại');
 });
+
+test('chế độ nhập khoản thu: mặc định là thu, không cần dấu +', () => {
+  const r = parseQuick('lương 11tr; thưởng 2tr', { defaultKind: 'income' });
+  assert.deepEqual(r.map((x) => x.kind), ['income', 'income']);
+  assert.deepEqual(r.map((x) => x.amount), [11_000_000, 2_000_000]);
+  assert.equal(r[0].categoryName, 'Lương');
+});
+
+test('chế độ nhập khoản thu: dấu - đầu số chuyển thành chi', () => {
+  const r = parseQuick('cafe -25k; lương 11tr', { defaultKind: 'income' });
+  assert.deepEqual(r.map((x) => x.kind), ['expense', 'income']);
+});
+
+test('chế độ mặc định không đổi: không có + vẫn là chi', () => {
+  assert.equal(parseQuick('lương 11tr')[0].kind, 'expense');
+});

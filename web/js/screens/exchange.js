@@ -1,15 +1,16 @@
 // Báo tỉ giá: máy tính báo giá sang / về, lưu báo giá, và CHỐT giao dịch.
-// Chỉ khi chốt, lãi mới được cộng vào thẻ nhận lãi (mặc định thẻ MB) đúng ngày của lệnh.
+// Chỉ khi chốt, lãi mới được cộng vào thẻ nhận lãi (mặc định thẻ MB; thẻ VND hay thẻ rúp đều được) đúng ngày của lệnh.
 
 import { h, money, field, select, seg, moneyInput, modal, toast, errMsg, confirmBox, emptyState, chip } from '../ui.js';
 import { store } from '../store.js';
 import { quoteSang, quoteVe, evalDeal, suggestedProfit } from '../fx.js';
-import { fmtNum } from '../money.js';
+import { fmtNum, roundTo, parseExpr, CUR_INFO } from '../money.js';
 import { todayStr, fmtDate, monthLabel } from '../dates.js';
 import { card, pageHead } from '../components.js';
-import { partyOptions, openPartyForm, accountOptions } from '../forms.js';
+import { partyOptions, openPartyForm, accountOptions, openAccountForm } from '../forms.js';
 import {
-  DIR_LABEL, statusOf, dealProfit, defaultProfitAccountId, saveDeal, confirmDeal, revertDeal, removeDeal,
+  DIR_LABEL, statusOf, dealProfit, defaultProfitAccountId, rememberProfitAccount, saveDeal, confirmDeal, revertDeal, removeDeal,
+  convertProfit, foreignFor,
   pendingPost, postPending, skipPending, newDealId, takeOpenRequest,
 } from '../deals.js';
 
@@ -211,7 +212,7 @@ export function render(root) {
 
 function pendingBanner(list, params) {
   const total = list.reduce((s, d) => s + (dealProfit(d, params) || 0), 0);
-  let accountId = defaultProfitAccountId();
+  let accountId = defaultProfitAccountId({ vndOnly: true });
   const accOpts = accountOptions({ only: (a) => a.currency === 'VND' });
   const sel = select(accOpts, accountId, (v) => { accountId = v; });
   return h('div', { class: 'banner info pending-post' },
@@ -263,61 +264,198 @@ export function openDealForm(d0, { confirm = false } = {}) {
   const wasDone = statusOf(d0) === 'done';
   const dir0 = d0.dir;
   const linkedTx = d0.profitTxId ? store.byId('txs', d0.profitTxId) : null;
-  const vndAccs = accountOptions({ includeArchived: true, only: (a) => a.currency === 'VND' });
+  // Thẻ nhận lãi: thẻ nào cũng được (VND hoặc ngoại tệ như thẻ rúp). Thẻ ngoại tệ → lãi quy đổi theo tỉ giá áng chừng.
+  const accOpts = () => accountOptions({ includeArchived: true });
+  const curOf = (id) => { const a = store.byId('accounts', id); return a ? a.currency : 'VND'; };
+  const symOf = (c) => (CUR_INFO[c] ? CUR_INFO[c].symbol : c);
+  const decOf = (c) => (c === 'VND' ? 0 : (CUR_INFO[c] ? CUR_INFO[c].dec : 2));
 
   const st = {
     date: d0.date || todayStr(), partyId: d0.partyId || '', note: d0.note || '',
     mode: wasDone || confirm ? 'confirm' : 'quote',
     manual: false,
-    post: wasDone ? !!linkedTx : vndAccs.length > 0,
+    post: wasDone ? !!linkedTx : accOpts().length > 0,
     accountId: linkedTx ? linkedTx.accountId : defaultProfitAccountId(),
+    unit: d0.profitUnit && d0.profitUnit !== 'VND' ? d0.profitUnit : 'VND', // đơn vị bạn nhập số lãi
+    rate: Number(d0.profitRate) > 0 ? String(d0.profitRate) : '',          // ₫ cho 1 đơn vị ngoại tệ
+    rateTouched: Number(d0.profitRate) > 0,
   };
+  const F = () => foreignFor(curOf(st.accountId));
+  if (st.unit !== 'VND' && st.unit !== F()) st.unit = 'VND';
   let suggestion = { value: null, source: null };
-  let autoSet = true;
 
   const editor = dealEditor({ dir: dir0, inputs: d0.inputs || {}, actual: d0.actual || {}, params, onChange: () => syncProfit() });
 
   const hint = h('span', { class: 'field-hint' });
+  const summary = h('p', { class: 'field-hint' });
   const resetBtn = h('button', { class: 'btn small', type: 'button', onclick: () => { st.manual = false; syncProfit(); } }, 'Dùng số tự tính');
-  const profitCtl = moneyInput({
-    value: wasDone && d0.profit != null ? Math.round(d0.profit) : '', currency: 'VND',
-    onChange: () => { if (!autoSet) { st.manual = true; refreshHint(); } },
+
+  // Lắng nghe thẳng sự kiện gõ phím (kể cả khi ô bị xóa trống — lúc đó moneyInput không báo onChange).
+  const onTyped = () => { st.manual = true; refreshHint(); refreshSummary(); };
+  const profitCtl = moneyInput({ value: wasDone && d0.profit != null ? Math.round(d0.profit) : '', currency: 'VND' });
+  const fxCtl = moneyInput({ value: '', currency: st.unit === 'VND' ? F() : st.unit });
+  const rateCtl = moneyInput({ value: st.rate, currency: null, placeholder: 'ví dụ 330' });
+  profitCtl.input.addEventListener('input', onTyped);
+  fxCtl.input.addEventListener('input', onTyped);
+  rateCtl.input.addEventListener('input', () => {
+    st.rate = rateCtl.input.value;
+    st.rateTouched = true;
+    if (st.unit !== 'VND' && !st.manual) setActiveValue(suggestion.value);
+    refreshSummary();
   });
-  autoSet = false;
+
+  const rateNum = () => { const r = parseExpr(rateCtl.input.value); return r && r.total > 0 ? r.total : NaN; };
+  const activeCtl = () => (st.unit === 'VND' ? profitCtl : fxCtl);
+  /** Lãi VND của số đang nhập (NaN nếu chưa đọc được hoặc thiếu tỉ giá). */
+  const currentVnd = () => {
+    const v = activeCtl().get();
+    if (!Number.isFinite(v)) return NaN;
+    return st.unit === 'VND' ? v : v * rateNum();
+  };
+  const needRate = () => st.unit !== 'VND' || (st.post && curOf(st.accountId) !== 'VND');
+
+  // Tỉ giá gợi ý: rúp → giá báo của chính lệnh này; không có thì tỉ giá trong Cài đặt.
+  function defaultRate(f) {
+    if (f === 'RUB') {
+      const q = evalDeal({ dir: dir0, ...editor.get() }, params).quote;
+      if (q && q.quote > 0) return roundTo(q.quote, 2);
+    }
+    const sr = Number((store.settings().rates || {})[f]);
+    return sr > 0 ? sr : '';
+  }
+  function applyRateDefault() {
+    if (st.rateTouched) return;
+    const d = defaultRate(F());
+    st.rate = d === '' ? '' : String(d);
+    rateCtl.set(st.rate);
+  }
+  /** Đặt ô đang hiện theo số lãi VND (đổi sang đơn vị đang chọn). */
+  function setActiveValue(vnd) {
+    if (st.unit === 'VND') profitCtl.set(vnd == null || !Number.isFinite(vnd) ? '' : Math.round(vnd));
+    else {
+      const r = rateNum();
+      fxCtl.set(vnd == null || !Number.isFinite(vnd) || !(r > 0) ? '' : roundTo(vnd / r, decOf(st.unit)));
+    }
+  }
 
   function refreshHint() {
     const s = suggestion;
+    const u = st.unit === 'VND' ? 'VND' : st.unit;
     hint.textContent = st.manual
       ? 'Bạn đã tự nhập số lãi.'
       : s.source === 'real' ? 'Tự tính từ giá thực tế. Sửa số này nếu lãi thật khác.'
         : s.source === 'quote' ? 'Đang lấy lãi theo giá báo — điền giá thực tế bên trên để tính chính xác.'
-          : 'Nhập lãi thực nhận (VND).';
+          : `Nhập lãi thực nhận (${u}).`;
     resetBtn.hidden = !(st.manual && s.value != null);
+  }
+  function refreshSummary() {
+    const rateOn = needRate();
+    summary.hidden = !rateOn;
+    if (!rateOn) return;
+    const typed = activeCtl().get();
+    const cardCur = st.post ? curOf(st.accountId) : 'VND';
+    const c = convertProfit({ amount: Number.isFinite(typed) ? typed : '', unit: st.unit, cardCurrency: cardCur, rate: rateNum() });
+    summary.classList.toggle('bad', !c.ok && Number.isFinite(typed));
+    if (!c.ok) { summary.textContent = Number.isFinite(typed) ? c.error : ''; return; }
+    const acc = store.byId('accounts', st.accountId);
+    const parts = [`Lãi tính ra ${money(c.vnd, 'VND', { sign: true })}`];
+    if (st.post && cardCur !== 'VND') parts.push(`cộng ${money(c.card, cardCur, { sign: true })} vào thẻ “${acc ? acc.name : ''}”`);
+    summary.textContent = `${parts.join(' · ')} (tỉ giá áng chừng ${fmtNum(c.rate, 4)} ₫/${c.foreign}).`;
   }
   function syncProfit() {
     suggestion = suggestedProfit({ dir: dir0, ...editor.get() }, params);
-    if (!st.manual) {
-      autoSet = true;
-      profitCtl.set(suggestion.value == null ? '' : Math.round(suggestion.value));
-      autoSet = false;
-    }
+    applyRateDefault();
+    if (!st.manual) setActiveValue(suggestion.value);
     refreshHint();
+    refreshSummary();
   }
-  suggestion = suggestedProfit({ dir: dir0, ...editor.get() }, params);
-  if (wasDone) st.manual = suggestion.value == null || Math.round(suggestion.value) !== Math.round(Number(d0.profit) || 0);
-  else syncProfit();
-  refreshHint();
+
+  const unitHost = h('div', { class: 'unit-host' });
+  const rateLabel = h('span', { class: 'field-label' });
+  const rateField = h('label', { class: 'field' }, rateLabel, rateCtl.el,
+    h('span', { class: 'field-hint' }, 'Chỉ để quy đổi lãi — nhập số áng chừng. Mặc định lấy từ giá báo của lệnh (rúp) hoặc từ Cài đặt; sửa lại nếu muốn.'));
+  /** Hiện đúng ô nhập theo đơn vị đang chọn; ô tỉ giá chỉ hiện khi có quy đổi. */
+  function showInputs() {
+    const f = F();
+    profitCtl.el.hidden = st.unit !== 'VND';
+    fxCtl.el.hidden = st.unit === 'VND';
+    fxCtl.setCurrency(st.unit === 'VND' ? f : st.unit);
+    rateField.hidden = !needRate();
+    rateLabel.textContent = `Tỉ giá áng chừng (₫ cho 1 ${f})`;
+  }
+  function drawUnit() {
+    const f = F();
+    unitHost.replaceChildren(seg([{ value: 'VND', label: '₫ VND' }, { value: f, label: `${symOf(f)} ${f}` }], st.unit, setUnit));
+  }
+  function setUnit(u) {
+    const oldVnd = currentVnd();
+    st.unit = u;
+    showInputs();
+    if (st.manual) setActiveValue(oldVnd); else setActiveValue(suggestion.value);
+    refreshHint();
+    refreshSummary();
+  }
+  function onCardChange(id) {
+    const oldF = F();
+    const oldVnd = currentVnd();
+    const oldUnit = st.unit;
+    st.accountId = id;
+    if (F() !== oldF) { st.rateTouched = false; if (st.unit !== 'VND') st.unit = 'VND'; }
+    applyRateDefault();
+    drawUnit();
+    showInputs();
+    if (st.unit !== oldUnit) { if (st.manual) setActiveValue(oldVnd); else setActiveValue(suggestion.value); }
+    refreshHint();
+    refreshSummary();
+  }
 
   const pSel = select(partyOptions(null, '— Không chọn —'), st.partyId, (v) => { st.partyId = v; });
-  const accSel = select(vndAccs, st.accountId, (v) => { st.accountId = v; });
+  const accSel = select(accOpts(), st.accountId, onCardChange);
   accSel.disabled = !st.post;
-  const postChk = h('input', { type: 'checkbox', checked: st.post, disabled: !vndAccs.length, onchange: (e) => { st.post = e.target.checked; accSel.disabled = !st.post; } });
+  const postChk = h('input', { type: 'checkbox', checked: st.post, onchange: (e) => { st.post = e.target.checked; accSel.disabled = !st.post; showInputs(); refreshSummary(); } });
+  const noAcc = h('p', { class: 'field-hint bad' }, 'Chưa có tài khoản nào — bấm “＋ Thẻ mới” để tạo thẻ nhận lãi.');
+  noAcc.hidden = accOpts().length > 0;
+  // Thẻ nhận lãi là tùy chọn của từng lệnh: chọn thẻ có sẵn, hoặc tạo thẻ mới (VND hoặc rúp…) ngay tại đây.
+  const newCardBtn = h('button', {
+    class: 'btn small', type: 'button',
+    onclick: () => openAccountForm(null, {
+      onSaved: (a) => {
+        accSel.replaceChildren(...accOpts().map((o) => h('option', { value: o.value, selected: o.value === a.id }, o.label)));
+        st.post = true;
+        postChk.checked = true;
+        accSel.disabled = false;
+        noAcc.hidden = true;
+        onCardChange(a.id);
+      },
+    }),
+  }, '＋ Thẻ mới');
+
+  // Mở lại lệnh đã chốt: hiện lại đúng số đã nhập (theo đơn vị đã chọn lúc đó).
+  suggestion = suggestedProfit({ dir: dir0, ...editor.get() }, params);
+  if (wasDone) {
+    st.manual = suggestion.value == null || Math.round(suggestion.value) !== Math.round(Number(d0.profit) || 0);
+    if (st.unit !== 'VND') {
+      const r = Number(d0.profitRate);
+      const signed = linkedTx && linkedTx.currency === st.unit ? (linkedTx.kind === 'expense' ? -1 : 1) * linkedTx.amount : (r > 0 ? roundTo((Number(d0.profit) || 0) / r, decOf(st.unit)) : '');
+      fxCtl.set(signed);
+    }
+    applyRateDefault();
+  } else syncProfit();
+  drawUnit();
+  showInputs();
+  refreshHint();
+  refreshSummary();
 
   const confirmHost = h('div', { class: 'form confirm-box' },
     editor.actualEl,
-    field('Lãi ghi nhận (VND, âm nếu lỗ)', h('div', {}, profitCtl.el, hint, resetBtn)),
+    h('div', { class: 'field' },
+      h('span', { class: 'field-label' }, 'Lãi ghi nhận (âm nếu lỗ)'),
+      unitHost, profitCtl.el, fxCtl.el, hint, resetBtn),
+    rateField,
+    summary,
     h('label', { class: 'check' }, postChk, ' Cộng lãi vào thẻ (ghi một khoản thu đúng ngày của lệnh)'),
-    vndAccs.length ? field('Thẻ nhận lãi', accSel) : h('p', { class: 'field-hint bad' }, 'Chưa có tài khoản VND nào — hãy tạo thẻ ở mục Tài khoản để cộng lãi.'),
+    field('Thẻ nhận lãi', h('div', { class: 'row-inline' }, accSel, newCardBtn), 'Thẻ VND hoặc thẻ rúp… đều được; thẻ ngoại tệ thì lãi được quy đổi theo tỉ giá áng chừng ở trên. App nhớ thẻ bạn chọn để gợi ý lần sau.'),
+    noAcc,
     !wasDone || linkedTx ? null : h('p', { class: 'field-hint' }, d0.postSkipped ? 'Lệnh này đang được đánh dấu “không cộng thẻ”.' : 'Lệnh này chưa được cộng vào thẻ.'));
 
   const statusChip = () => (statusOf(d0) === 'done' ? chip('Đã chốt', 'good') : chip('Báo giá', 'muted'));
@@ -352,17 +490,26 @@ export function openDealForm(d0, { confirm = false } = {}) {
   const onSaveQuote = () => {
     const doc = buildDoc();
     if (!doc) return;
-    const { profit, profitTxId, postSkipped, ...rest } = doc; // eslint-disable-line no-unused-vars
+    const { profit, profitTxId, postSkipped, profitUnit, profitRate, ...rest } = doc; // eslint-disable-line no-unused-vars
     run(() => saveDeal({ ...rest, status: 'quote' }), 'Đã lưu báo giá.');
   };
   const onConfirm = () => {
     const doc = buildDoc();
     if (!doc) return;
-    const profit = Number(profitCtl.get());
-    if (!Number.isFinite(profit)) return toast('Nhập số lãi (hoặc điền giá thực tế để tự tính).', 'error');
+    const typed = activeCtl().get();
+    if (!Number.isFinite(typed)) return toast('Nhập số lãi (hoặc điền giá thực tế để tự tính).', 'error');
     if (st.post && !st.accountId) return toast('Chọn thẻ để cộng lãi.', 'error');
-    const msg = st.post && Math.round(profit) !== 0 ? `Đã chốt. Lãi ${money(Math.round(profit), 'VND', { sign: true })} đã vào thẻ ngày ${fmtDate(st.date)}.` : 'Đã chốt giao dịch.';
-    run(() => confirmDeal({ ...doc, profit }, { post: st.post, accountId: st.accountId }), msg);
+    const cardCur = st.post ? curOf(st.accountId) : 'VND';
+    const conv = convertProfit({ amount: typed, unit: st.unit, cardCurrency: cardCur, rate: rateNum() });
+    if (!conv.ok) return toast(conv.error, 'error');
+    const inCard = cardCur !== 'VND' ? ` (${money(conv.card, cardCur, { sign: true })})` : '';
+    const msg = st.post && conv.card !== 0 ? `Đã chốt. Lãi ${money(conv.vnd, 'VND', { sign: true })}${inCard} đã vào thẻ ngày ${fmtDate(st.date)}.` : 'Đã chốt giao dịch.';
+    run(async () => {
+      await confirmDeal(
+        { ...doc, profit: conv.vnd, profitUnit: st.unit, profitRate: conv.rate },
+        { post: st.post, accountId: st.accountId, cardAmount: st.post && cardCur !== 'VND' ? conv.card : null });
+      if (st.post) rememberProfitAccount(st.accountId);
+    }, msg);
   };
   const onDelete = async () => {
     const extra = d0.profitTxId ? ' Khoản lãi đã cộng vào thẻ cũng sẽ bị xóa.' : '';

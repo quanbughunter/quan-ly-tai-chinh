@@ -45,14 +45,14 @@ export function guessCategoryName(note, kind = 'expense') {
 /**
  * @returns {Array<{raw, kind, amount, currency, note, categoryName, error}>}
  */
-export function parseQuick(text, { defaultCurrency = 'VND' } = {}) {
+export function parseQuick(text, { defaultCurrency = 'VND', defaultKind = 'expense' } = {}) {
   const parts = String(text || '')
     .split(/\n|;|,\s+(?=\D)/)
     .map((s) => s.trim())
     .filter(Boolean);
   return parts.map((raw) => {
     let s = raw;
-    let kind = 'expense';
+    let kind = defaultKind;
     let currency = null;
     s = s.replace(CUR_RE, (m, w, sym) => {
       currency = CUR_WORD[String(w || sym).toLowerCase()] || currency;
@@ -63,7 +63,7 @@ export function parseQuick(text, { defaultCurrency = 'VND' } = {}) {
     if (!m) return { raw, error: 'Không thấy số tiền' };
     let numStr = m[1];
     if (numStr.startsWith('+')) { kind = 'income'; numStr = numStr.slice(1); }
-    else if (numStr.startsWith('-')) numStr = numStr.slice(1);
+    else if (numStr.startsWith('-')) { numStr = numStr.slice(1); if (defaultKind === 'income') kind = 'expense'; }
     const amount = parseAmount(numStr + (m[2] || ''));
     if (!(amount > 0)) return { raw, error: 'Số tiền không hợp lệ' };
     const note = `${s.slice(0, m.index)} ${s.slice(m.index + m[0].length)}`.replace(/\s+/g, ' ').trim();

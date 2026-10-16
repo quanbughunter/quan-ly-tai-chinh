@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { splitEven, planShare, buildShareTxs, describeShare } from '../web/js/share.js';
+import { splitEven, planShare, buildShareTxs, describeShare, planSendHome, buildSendHomeTx, describeSendHome } from '../web/js/share.js';
 
 // Mọi tên và số liệu ở đây là tự đặt.
 
@@ -109,4 +109,37 @@ test('mô tả tác động để người dùng kiểm tra', () => {
   const sub = describeShare({ mode: 'sub', amount: 300, currency: 'RUB', plan: planShare({ mode: 'sub', amount: 300, currency: 'RUB', partyIds: ['a'] }), nameOf });
   assert.match(sub, /nợ giảm/);
   assert.equal(describeShare({ mode: 'add', amount: 1, currency: 'RUB', plan: { ok: false, error: 'Chọn ít nhất một người.' } }), 'Chọn ít nhất một người.');
+});
+
+test('gửi bố: để trống = gửi cả khoản, không giữ lại gì', () => {
+  const p = planSendHome({ amount: 11_000_000, currency: 'VND' });
+  assert.deepEqual(p, { ok: true, amount: 11_000_000, keep: 0 });
+  assert.match(describeSendHome({ plan: p, currency: 'VND' }), /Gửi bố cả 11\.000\.000 ₫/);
+});
+
+test('gửi bố một phần: phần còn lại giữ trong tài khoản', () => {
+  const p = planSendHome({ amount: 11_000_000, sendAmount: 8_000_000, currency: 'VND' });
+  assert.equal(p.ok, true);
+  assert.equal(p.amount, 8_000_000);
+  assert.equal(p.keep, 3_000_000);
+  assert.match(describeSendHome({ plan: p, currency: 'VND' }), /giữ lại 3\.000\.000 ₫/);
+});
+
+test('gửi bố: số gửi vượt khoản thu hoặc không dương thì báo lỗi', () => {
+  assert.equal(planSendHome({ amount: 100, sendAmount: 150, currency: 'RUB' }).ok, false);
+  assert.equal(planSendHome({ amount: 100, sendAmount: 0, currency: 'RUB' }).ok, false);
+  assert.equal(planSendHome({ amount: 0, currency: 'RUB' }).ok, false);
+  assert.equal(planSendHome({ amount: 100, sendAmount: 100, currency: 'RUB' }).ok, true); // đúng bằng khoản thu
+});
+
+test('gửi bố: số lẻ RUB không bị lệch', () => {
+  const p = planSendHome({ amount: 10.1, sendAmount: 3.05, currency: 'RUB' });
+  assert.equal(p.amount, 3.05);
+  assert.equal(p.keep, 7.05);
+});
+
+test('buildSendHomeTx: khoản chi trừ cùng tài khoản, ghi chú nói rõ gửi ai', () => {
+  const t = buildSendHomeTx({ date: '2026-10-16', amount: 8_000_000, currency: 'VND', accountId: 'mb', categoryId: 'c1', note: 'lương' });
+  assert.deepEqual(t, { date: '2026-10-16', kind: 'expense', amount: 8_000_000, currency: 'VND', accountId: 'mb', categoryId: 'c1', note: 'Gửi bố · lương' });
+  assert.equal(buildSendHomeTx({ date: 'd', amount: 1, currency: 'VND', accountId: 'a' }).note, 'Gửi bố');
 });
