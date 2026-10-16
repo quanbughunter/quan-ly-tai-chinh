@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sơ đồ cấu trúc QLTC</title>
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+body{margin:0}
+:root{
+  --bg:#f6f3fc; --surface:#ffffff; --surface2:#efeaf9; --fg:#241f35; --muted:#5d5777; --line:#ddd6ee;
+  --accent:#6a4fd8; --accent-soft:#e8e2fb; --code-bg:#efeaf9;
+  --ui-bg:#ebe5ff; --ui-line:#8a76e4; --lg-bg:#dcf3e8; --lg-line:#37a276; --st-bg:#dbeefa; --st-line:#3a8fc7;
+  --cl-bg:#fcefd0; --cl-line:#c9952a; --lo-bg:#fce1e8; --lo-line:#d65a7b; --nu-line:#8a84a3;
+  --edge:#5d5777; --ok:#1f7a55; --warn:#a4640f;
+  --font-head:'Bricolage Grotesque','Segoe UI',system-ui,-apple-system,sans-serif;
+  --font-body:'IBM Plex Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14111f; --surface:#1c1829; --surface2:#251f37; --fg:#ece8f8; --muted:#aaa3c4; --line:#373050;
+    --accent:#a999ff; --accent-soft:#2c2550; --code-bg:#251f37;
+    --ui-bg:#2a2352; --ui-line:#9585f2; --lg-bg:#153126; --lg-line:#4cc190; --st-bg:#142a3a; --st-line:#4aa6de;
+    --cl-bg:#382b10; --cl-line:#e2b049; --lo-bg:#3a1a26; --lo-line:#e87a98; --nu-line:#7d7699;
+    --edge:#aaa3c4; --ok:#5fd3a0; --warn:#e8b25a; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14111f; --surface:#1c1829; --surface2:#251f37; --fg:#ece8f8; --muted:#aaa3c4; --line:#373050;
+  --accent:#a999ff; --accent-soft:#2c2550; --code-bg:#251f37;
+  --ui-bg:#2a2352; --ui-line:#9585f2; --lg-bg:#153126; --lg-line:#4cc190; --st-bg:#142a3a; --st-line:#4aa6de;
+  --cl-bg:#382b10; --cl-line:#e2b049; --lo-bg:#3a1a26; --lo-line:#e87a98; --nu-line:#7d7699;
+  --edge:#aaa3c4; --ok:#5fd3a0; --warn:#e8b25a; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font:15px/1.65 var(--font-body);-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+a{color:var(--accent)}
+code{font:0.88em var(--font-mono);background:var(--code-bg);padding:.1em .38em;border-radius:5px;overflow-wrap:anywhere}
+pre{margin:0;font:13px/1.55 var(--font-mono);background:var(--code-bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow-x:auto}
+pre code{background:none;padding:0;font-size:inherit;overflow-wrap:normal}
+.in{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* nav */
+.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
+.toc .in{display:flex;gap:2px;overflow-x:auto;padding-block:8px;scrollbar-width:thin}
+.toc a{flex:none;text-decoration:none;color:var(--muted);font:500 13px var(--font-body);padding:6px 11px;border-radius:999px;white-space:nowrap}
+.toc a:hover{color:var(--fg);background:var(--surface2)}
+.toc a[aria-current="true"]{color:var(--accent);background:var(--accent-soft);font-weight:600}
+
+/* hero */
+.hero{padding-block:44px 28px}
+.kicker{font:600 12px var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+h1{font:700 clamp(1.95rem,5.2vw,3.15rem)/1.08 var(--font-head);letter-spacing:-.02em;margin:0 0 16px;text-wrap:balance;max-width:20ch}
+.lead{font-size:1.1rem;color:var(--muted);max-width:62ch;margin:0 0 24px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0;padding:0;list-style:none}
+.stats li{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.stats b{display:block;font:700 1.9rem/1 var(--font-head);color:var(--accent);margin-bottom:6px}
+.stats span{font-size:13px;color:var(--muted)}
+
+/* sections */
+section{padding-block:38px;border-top:1px solid var(--line);scroll-margin-top:56px}
+h2{font:700 clamp(1.4rem,3.4vw,1.9rem)/1.2 var(--font-head);letter-spacing:-.01em;margin:0 0 14px;text-wrap:balance;display:flex;gap:12px;align-items:baseline}
+h2 .n{font:600 .8rem var(--font-mono);color:var(--accent);background:var(--accent-soft);border-radius:8px;padding:3px 8px;flex:none;position:relative;top:-2px}
+h3{font:600 1.1rem/1.3 var(--font-head);margin:30px 0 8px;text-wrap:balance}
+p{margin:0 0 14px;max-width:72ch}
+ul,ol{margin:0 0 16px;padding-left:1.3em;max-width:74ch}
+li{margin-bottom:6px}
+li::marker{color:var(--accent)}
+.sub{color:var(--muted)}
+
+/* figures */
+figure{margin:22px 0}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;overflow-x:auto}
+.fig svg{display:block;width:100%;max-width:var(--w);min-width:var(--minw);height:auto;margin-inline:auto}
+figcaption{font-size:13.5px;color:var(--muted);margin-top:10px;max-width:80ch}
+figcaption b{color:var(--fg)}
+.hint{display:none;font-size:12px;color:var(--muted);margin:8px 0 0}
+@media (max-width:820px){.hint{display:block}}
+.bx{stroke-width:1.5}
+.bx.ui{fill:var(--ui-bg);stroke:var(--ui-line)} .bx.lg{fill:var(--lg-bg);stroke:var(--lg-line)}
+.bx.st{fill:var(--st-bg);stroke:var(--st-line)} .bx.cl{fill:var(--cl-bg);stroke:var(--cl-line)}
+.bx.lo{fill:var(--lo-bg);stroke:var(--lo-line)} .bx.nu{fill:var(--surface2);stroke:var(--nu-line)}
+.bx.dash{stroke-dasharray:5 4}
+.frame{fill:none;stroke:var(--line);stroke-width:1.6;stroke-dasharray:3 5}
+.ft{font:600 11px var(--font-body);letter-spacing:.07em;fill:var(--muted)}
+.t{font:500 13px var(--font-body);fill:var(--fg)}
+.bt{font:600 13px var(--font-body);fill:var(--fg)}
+.ts{font:400 12px var(--font-body);fill:var(--muted)}
+.ts.tm{font-family:var(--font-mono);font-size:11.5px}
+.lbl{font:500 12px var(--font-body);fill:var(--muted)}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.6}
+.edge.dashed{stroke-dasharray:5 4}
+.mkp{fill:var(--edge)}
+.life{stroke:var(--line);stroke-width:1.5;stroke-dasharray:4 5}
+
+/* legend + cards */
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 4px;padding:0;list-style:none}
+.legend li{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;color:var(--muted)}
+.sw{width:14px;height:14px;border-radius:4px;border:1.5px solid;display:inline-block}
+.sw.ui{background:var(--ui-bg);border-color:var(--ui-line)} .sw.lg{background:var(--lg-bg);border-color:var(--lg-line)}
+.sw.st{background:var(--st-bg);border-color:var(--st-line)} .sw.cl{background:var(--cl-bg);border-color:var(--cl-line)}
+.sw.lo{background:var(--lo-bg);border-color:var(--lo-line)}
+.legend li{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:22px 0 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}
+.card h3{margin:0 0 6px;font-size:1rem}
+.card p{margin:0;font-size:14.5px;color:var(--muted)}
+.note{border-left:4px solid var(--accent);background:var(--surface);border-radius:0 12px 12px 0;padding:12px 16px;margin:18px 0;max-width:78ch;border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.note p:last-child{margin:0}
+.note.warn{border-left-color:var(--warn)}
+.note b.lab{display:block;font:600 12px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+.note.warn b.lab{color:var(--warn)}
+
+/* layers */
+.layers{display:grid;gap:10px;margin:18px 0}
+.layer{display:grid;grid-template-columns:170px minmax(0,1fr);background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.layer>b{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:14px 16px;font:600 .98rem var(--font-head);border-right:1px solid var(--line)}
+.layer>b small{font:400 12px var(--font-body);color:var(--muted)}
+.layer.ui>b{background:var(--ui-bg)} .layer.lg>b{background:var(--lg-bg)} .layer.st>b{background:var(--st-bg)} .layer.lo>b{background:var(--lo-bg)}
+.layer div{padding:12px 16px;min-width:0}
+.layer p{margin:0 0 8px;font-size:14.5px}
+.layer p:last-child{margin:0}
+.files{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.files code{font-size:12px;background:var(--surface2);border:1px solid var(--line)}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface);margin:16px 0}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 12px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--surface2);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.num.neg{color:var(--warn)} td.num.pos{color:var(--ok)}
+tr.total td{font-weight:600;background:var(--surface2)}
+.tag{display:inline-block;font:500 11.5px var(--font-mono);padding:1px 7px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);white-space:nowrap}
+
+/* record anatomy */
+.rec{display:grid;grid-template-columns:repeat(6,minmax(0,auto));gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface);font-size:13px;margin:14px 0 10px}
+.rec div{padding:8px 12px;border-right:1px solid var(--line);min-width:0}
+.rec div:last-child{border-right:0}
+.rec .h{font:600 11.5px var(--font-mono);color:var(--muted);background:var(--surface2);display:block;margin:-8px -12px 8px;padding:6px 12px;border-bottom:1px solid var(--line)}
+.rec .v{font-family:var(--font-mono);font-size:12px;overflow-wrap:anywhere}
+.rec .wide{grid-column:span 1}
+
+/* steps */
+ol.steps{list-style:none;counter-reset:s;padding:0;margin:16px 0;display:grid;gap:10px}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;margin:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+ol.steps li::before{content:counter(s);display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font:600 13px var(--font-mono)}
+ol.steps li>div{min-width:0}
+
+/* formulas */
+.formulas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}
+.formula{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.formula h3{margin:0 0 8px;font-size:.98rem}
+.formula pre{font-size:12px;padding:10px 12px;margin-bottom:8px}
+.formula p{font-size:13.5px;color:var(--muted);margin:0}
+
+/* file map */
+.map{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}
+.dir{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.dir h3{margin:0 0 8px;font:600 .95rem var(--font-mono);color:var(--accent)}
+.dir dl{margin:0;display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:4px 14px;font-size:13.5px}
+.dir dt{font-family:var(--font-mono);font-size:12px;padding-top:2px;color:var(--fg);overflow-wrap:anywhere}
+.dir dd{margin:0;color:var(--muted)}
+
+footer{border-top:1px solid var(--line);padding-block:26px 48px;color:var(--muted);font-size:13.5px}
+footer p{max-width:80ch}
+
+@media (max-width:820px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cards,.formulas,.map{grid-template-columns:minmax(0,1fr)}
+  .layer{grid-template-columns:minmax(0,1fr)}
+  .layer>b{border-right:0;border-bottom:1px solid var(--line);flex-direction:row;align-items:baseline;gap:10px}
+  .rec{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rec div{border-bottom:1px solid var(--line)}
+  .hero{padding-block:30px 20px}
+  h2{flex-direction:column;gap:6px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+</style>
+</head>
+<body>
+<nav class="toc" aria-label="Mục lục"><div class="in" id="toc">
+  <a href="#tong-quan">Tổng quan</a><a href="#cac-lop">Các lớp</a><a href="#khoi-dong">Khởi động</a><a href="#luu-tru">Lưu trữ</a><a href="#ghi">Ghi dữ liệu</a><a href="#so-cai">Sổ cái</a><a href="#man-hinh">Màn hình</a><a href="#trien-khai">Triển khai</a><a href="#bao-mat">Bảo mật</a><a href="#danh-doi">Đánh đổi</a><a href="#tep">Bản đồ tệp</a>
+</div></nav>
+
+<header class="hero"><div class="in">
+  <p class="kicker">Tài liệu kiến trúc · 16/10/2026</p>
+  <h1>Quản lý tài chính: bản đồ cấu trúc và cách lưu dữ liệu</h1>
+  <p class="lead">Một ứng dụng web thuần HTML và JavaScript, chạy như PWA trên GitHub Pages và đóng gói thành APK Android bằng Capacitor. Dữ liệu nằm ở Supabase; mọi phép tính số dư, công nợ và lãi đổi tiền đều làm ngay trên máy bạn.</p>
+  <ul class="stats">
+    <li><b>9</b><span>bộ dữ liệu (collection)</span></li>
+    <li><b>1</b><span>bảng duy nhất trên Supabase</span></li>
+    <li><b>0</b><span>bước build cho phần web</span></li>
+    <li><b>84</b><span>bài kiểm thử tự động</span></li>
+  </ul>
+</div></header>
+
+<main>
+
+<section id="tong-quan"><div class="in">
+  <h2><span class="n">01</span>Bức tranh tổng thể</h2>
+  <p>Mã nguồn là một thư mục <code>web/</code> gồm các tệp HTML, CSS và ES module, không cần bước build. Cùng thư mục đó được dùng ở hai nơi: GitHub Pages phục vụ nó như một trang web (cài được như ứng dụng), và Capacitor chép nó vào APK Android. Dữ liệu thật chỉ nằm ở Supabase.</p>
+  <figure>
+    <div class="fig"><svg style="--w:1000px;--minw:880px" viewBox="0 0 1000 490" width="1000" role="img" aria-label="Sơ đồ chạy thật của app: giao diện, kho dữ liệu store.js, bộ nhớ RAM, phần tính toán, các bản sao trên máy và Supabase" xmlns="http://www.w3.org/2000/svg"><defs><marker id="mk-rt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.5 L9 5 L1 8.5 Z" class="mkp"/></marker></defs><rect x="20" y="20" width="600" height="450" rx="14" class="frame nu"/><text x="36" y="44" class="ft">THIẾT BỊ CỦA BẠN · trình duyệt hoặc APK (WebView)</text><rect x="740" y="20" width="240" height="450" rx="14" class="frame nu"/><text x="756" y="44" class="ft">ĐÁM MÂY · SUPABASE</text><rect x="40" y="64" width="230" height="96" rx="10" class="bx ui"/><text x="155.0" y="86" class="bt" text-anchor="middle">Giao diện</text><text x="155.0" y="103" class="ts" text-anchor="middle">index.html · main.js (router)</text><text x="155.0" y="120" class="ts" text-anchor="middle">screens/*.js · forms.js</text><text x="155.0" y="137" class="ts" text-anchor="middle">ui.js: h() dựng DOM</text><rect x="380" y="64" width="216" height="96" rx="10" class="bx lg"/><text x="488.0" y="86" class="bt" text-anchor="middle">store.js</text><text x="488.0" y="103" class="ts" text-anchor="middle">put · del · loadAll · refresh</text><text x="488.0" y="120" class="ts" text-anchor="middle">ghi lạc quan, hoàn tác khi lỗi</text><text x="488.0" y="137" class="ts" text-anchor="middle">emit() báo màn vẽ lại</text><rect x="40" y="228" width="230" height="96" rx="10" class="bx lg"/><text x="155.0" y="250" class="bt" text-anchor="middle">Tính toán (hàm thuần)</text><text x="155.0" y="267" class="ts" text-anchor="middle">calc.js: số dư, nợ, tổng quan</text><text x="155.0" y="284" class="ts" text-anchor="middle">fx.js · deals.js: đổi tiền</text><text x="155.0" y="301" class="ts" text-anchor="middle">money · share · dates · quickadd</text><rect x="380" y="228" width="216" height="96" rx="10" class="bx st"/><text x="488.0" y="250" class="bt" text-anchor="middle">Bộ nhớ RAM · S.data</text><text x="488.0" y="267" class="ts" text-anchor="middle">9 bộ dữ liệu, nạp hết</text><text x="488.0" y="284" class="ts" text-anchor="middle">khi mở app</text><text x="488.0" y="301" class="ts" text-anchor="middle">đóng app là mất</text><rect x="40" y="372" width="180" height="83" rx="10" class="bx lo"/><text x="130.0" y="394" class="bt" text-anchor="middle">localStorage</text><text x="130.0" y="411" class="ts" text-anchor="middle">giao diện · thẻ gần nhất</text><text x="130.0" y="428" class="ts" text-anchor="middle">token đăng nhập</text><rect x="232" y="372" width="140" height="83" rx="10" class="bx lo"/><text x="302.0" y="394" class="bt" text-anchor="middle">Service Worker</text><text x="302.0" y="411" class="ts" text-anchor="middle">cache mã nguồn</text><text x="302.0" y="428" class="ts" text-anchor="middle">qltc-v10</text><rect x="380" y="372" width="216" height="83" rx="10" class="bx lo"/><text x="488.0" y="394" class="bt" text-anchor="middle">IndexedDB · qltc</text><text x="488.0" y="411" class="ts" text-anchor="middle">bản sao để xem offline</text><text x="488.0" y="428" class="ts" text-anchor="middle">qltc:cache:‹userId›</text><rect x="760" y="64" width="200" height="130" rx="10" class="bx cl"/><text x="860.0" y="86" class="bt" text-anchor="middle">Postgres · records</text><text x="860.0" y="103" class="ts" text-anchor="middle">id · user_id</text><text x="860.0" y="120" class="ts" text-anchor="middle">collection · data (jsonb)</text><text x="860.0" y="137" class="ts" text-anchor="middle">created_at · updated_at</text><text x="860.0" y="154" class="ts" text-anchor="middle">RLS: chỉ chủ dòng thấy</text><rect x="760" y="228" width="200" height="96" rx="10" class="bx cl"/><text x="860.0" y="250" class="bt" text-anchor="middle">Supabase Auth</text><text x="860.0" y="267" class="ts" text-anchor="middle">email + mật khẩu</text><text x="860.0" y="284" class="ts" text-anchor="middle">phát JWT cho phiên</text><text x="860.0" y="301" class="ts" text-anchor="middle">tắt đăng ký công khai</text><text x="860" y="372" class="ts" text-anchor="middle">Không có máy chủ ứng dụng:</text><text x="860" y="390" class="ts" text-anchor="middle">app gọi thẳng REST của</text><text x="860" y="408" class="ts" text-anchor="middle">Supabase bằng supabase-js.</text><polyline points="270,100 380,100" class="edge" marker-end="url(#mk-rt)"/><text x="325" y="90" class="lbl" text-anchor="middle">put / del / refresh</text><polyline points="380,140 270,140" class="edge" marker-end="url(#mk-rt)"/><text x="325" y="160" class="lbl" text-anchor="middle">vẽ lại màn</text><polyline points="488,160 488,228" class="edge" marker-end="url(#mk-rt)"/><text x="496" y="198" class="lbl">ghi / nạp</text><polyline points="380,276 270,276" class="edge" marker-end="url(#mk-rt)"/><text x="325" y="268" class="lbl" text-anchor="middle">đọc dữ liệu</text><polyline points="155,228 155,160" class="edge" marker-end="url(#mk-rt)"/><text x="163" y="198" class="lbl">kết quả</text><polyline points="488,324 488,372" class="edge" marker-end="url(#mk-rt)"/><text x="496" y="354" class="lbl">bản sao sau mỗi lần tải</text><polyline points="596,92 760,92" class="edge" marker-end="url(#mk-rt)"/><text x="678" y="84" class="lbl" text-anchor="middle">ghi</text><polyline points="760,130 596,130" class="edge" marker-end="url(#mk-rt)"/><text x="678" y="122" class="lbl" text-anchor="middle">tải hết</text><polyline points="596,150 690,150 690,276 760,276" class="edge" marker-end="url(#mk-rt)"/><text x="682" y="214" class="lbl" text-anchor="end">đăng nhập</text></svg></div>
+    <p class="hint">← vuốt ngang để xem hết hình →</p>
+    <figcaption><b>Hình 1.</b> Luồng dữ liệu lúc app chạy. Màn hình chỉ nói chuyện với <code>store.js</code>; <code>store.js</code> là nơi duy nhất gọi Supabase. localStorage và Service Worker không có mũi tên vì chúng không chứa số liệu tiền (chỉ giữ lựa chọn giao diện, token đăng nhập và bản sao mã nguồn).</figcaption>
+  </figure>
+  <ul class="legend" aria-label="Chú giải màu">
+    <li><span class="sw ui"></span>Giao diện</li><li><span class="sw lg"></span>Logic và tính toán</li><li><span class="sw st"></span>Nơi giữ dữ liệu</li><li><span class="sw cl"></span>Đám mây</li><li><span class="sw lo"></span>Lưu trên máy</li>
+  </ul>
+  <div class="cards">
+    <div class="card"><h3>Không có máy chủ riêng</h3><p>Trình duyệt hoặc APK gọi thẳng REST của Supabase bằng thư viện supabase-js (bản 2.117.3, chép sẵn trong <code>web/vendor</code>). Không có API tự viết, không có tác vụ chạy nền.</p></div>
+    <div class="card"><h3>Tải hết, tính tại máy</h3><p>Lúc mở app, toàn bộ bản ghi của bạn (vài nghìn dòng) được tải vào RAM. Số dư, công nợ, tổng tài sản, biểu đồ đều là phép tính trên mảng đó.</p></div>
+    <div class="card"><h3>Số dư không được lưu</h3><p>Chỉ lưu số dư đầu kỳ và các giao dịch. Số dư hiện tại luôn được tính lại từ giao dịch, nên không thể lệch khỏi sổ.</p></div>
+  </div>
+</div></section>
+
+<section id="cac-lop"><div class="in">
+  <h2><span class="n">02</span>Mã nguồn chia lớp thế nào</h2>
+  <p>Bốn lớp, phụ thuộc một chiều từ trên xuống: giao diện gọi nghiệp vụ, nghiệp vụ gọi lớp dữ liệu. Phần tính toán thuần không biết gì về giao diện hay mạng, nên kiểm thử được bằng Node mà không cần trình duyệt.</p>
+  <div class="layers">
+    <div class="layer ui"><b>Giao diện<small>web/js, web/css</small></b><div>
+      <div class="files"><code>index.html</code><code>main.js</code><code>screens/*.js</code><code>forms.js</code><code>components.js</code><code>ui.js</code><code>theme.js</code><code>css/app.css</code></div>
+      <p><code>main.js</code> dựng khung (thanh bên, tab dưới, nút ＋), định tuyến theo <code>#hash</code> và vẽ lại khi dữ liệu đổi. Mỗi màn là một module có hàm <code>render(view, {params})</code>.</p>
+      <p>Không dùng framework: <code>ui.js</code> có hàm <code>h()</code> dựng thẳng DOM và không bao giờ đưa dữ liệu người dùng vào <code>innerHTML</code>, nên không có lỗ hổng chèn mã qua ghi chú hay tên.</p>
+    </div></div>
+    <div class="layer lg"><b>Nghiệp vụ<small>hàm thuần + nghiệp vụ có ghi</small></b><div>
+      <div class="files"><code>calc.js</code><code>fx.js</code><code>money.js</code><code>dates.js</code><code>share.js</code><code>quickadd.js</code><code>deals.js</code><code>scholarship.js</code></div>
+      <p><b>Hàm thuần</b> (<code>calc</code>, <code>fx</code>, <code>money</code>, <code>dates</code>, <code>share</code>, <code>quickadd</code>): nhận dữ liệu, trả kết quả, không đụng DOM, mạng hay <code>store</code>. Đây là chỗ có kiểm thử.</p>
+      <p><b>Nghiệp vụ có ghi</b> (<code>deals</code>, <code>scholarship</code>): vừa có hàm thuần (quy đổi lãi, chọn thẻ), vừa gọi <code>store</code> để lưu lệnh đổi tiền hoặc học bổng cùng giao dịch đi kèm.</p>
+    </div></div>
+    <div class="layer st"><b>Dữ liệu<small>web/js/store.js, model.js</small></b><div>
+      <div class="files"><code>store.js</code><code>model.js</code></div>
+      <p><code>store</code> là cổng duy nhất vào dữ liệu: <code>all</code>, <code>byId</code>, <code>put</code>, <code>putMany</code>, <code>del</code>, <code>delMany</code>, <code>refresh</code>, <code>exportAll</code>, <code>importAll</code>. Bên dưới có hai backend cùng giao diện: <code>CloudBackend</code> (Supabase) và <code>LocalBackend</code> (IndexedDB, chế độ thử). <code>model.js</code> giữ danh sách 9 collection, 15 danh mục mặc định, cài đặt mặc định và hàm tạo id.</p>
+    </div></div>
+    <div class="layer lo"><b>Hạ tầng<small>cấu hình, ngoại tuyến, đóng gói</small></b><div>
+      <div class="files"><code>config.js</code><code>vendor/supabase.js</code><code>sw.js</code><code>manifest.webmanifest</code><code>capacitor.config.json</code></div>
+      <p><code>config.js</code> chứa địa chỉ Supabase và khóa <em>anon</em> công khai. <code>sw.js</code> là Service Worker giúp mở được khi mất mạng. <code>capacitor.config.json</code> đặt <code>webDir: web</code> và <code>androidScheme: https</code> cho APK.</p>
+    </div></div>
+  </div>
+</div></section>
+
+<section id="khoi-dong"><div class="in">
+  <h2><span class="n">03</span>Khởi động và điều hướng</h2>
+  <p>Lưu đồ dưới chạy mỗi lần mở app. Điểm đáng chú ý: app không bao giờ hiện số liệu cũ mà không báo. Nếu phải dùng bản sao, biểu ngữ “Đang xem bản lưu gần nhất (ngoại tuyến)” hiện lên và mọi thao tác ghi bị chặn.</p>
+  <figure>
+    <div class="fig"><svg style="--w:900px;--minw:810px" viewBox="0 0 900 890" width="900" role="img" aria-label="Lưu đồ khởi động: kiểm tra cấu hình Supabase, đăng nhập, tải dữ liệu, rơi về bản sao offline rồi vẽ màn hình" xmlns="http://www.w3.org/2000/svg"><defs><marker id="mk-bt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.5 L9 5 L1 8.5 Z" class="mkp"/></marker></defs><rect x="310" y="16" width="280" height="56" rx="10" class="bx ui"/><text x="450.0" y="38" class="bt" text-anchor="middle">Mở index.html</text><text x="450.0" y="55" class="ts" text-anchor="middle">nạp config.js → supabase.js → main.js</text><rect x="310" y="98" width="280" height="56" rx="10" class="bx lg"/><text x="450.0" y="120" class="bt" text-anchor="middle">boot()</text><text x="450.0" y="137" class="ts" text-anchor="middle">applyTheme() → store.init(cfg)</text><polyline points="450,72 450,98" class="edge" marker-end="url(#mk-bt)"/><polyline points="450,154 450,176" class="edge" marker-end="url(#mk-bt)"/><polygon points="450,176.0 590.0,214 450,252.0 310.0,214" class="bx nu"/><text x="450" y="210" class="t" text-anchor="middle">Có URL + khóa Supabase</text><text x="450" y="226" class="t" text-anchor="middle">trong config.js?</text><rect x="30" y="179" width="200" height="70" rx="10" class="bx lo"/><text x="130.0" y="201" class="bt" text-anchor="middle">Chế độ thử</text><text x="130.0" y="218" class="ts" text-anchor="middle">LocalBackend</text><text x="130.0" y="235" class="ts" text-anchor="middle">IndexedDB: qltc:local</text><polyline points="310,214 230,214" class="edge" marker-end="url(#mk-bt)"/><text x="270" y="206" class="lbl" text-anchor="middle">Không</text><polyline points="450,252 450,282" class="edge" marker-end="url(#mk-bt)"/><text x="458" y="272" class="lbl">Có</text><rect x="310" y="282" width="280" height="56" rx="10" class="bx cl"/><text x="450.0" y="304" class="bt" text-anchor="middle">Tạo client Supabase</text><text x="450.0" y="321" class="ts" text-anchor="middle">getSession(): đọc token đã lưu</text><polyline points="450,338 450,360" class="edge" marker-end="url(#mk-bt)"/><polygon points="450,360.0 590.0,398 450,436.0 310.0,398" class="bx nu"/><text x="450" y="394" class="t" text-anchor="middle">Còn phiên</text><text x="450" y="410" class="t" text-anchor="middle">đăng nhập?</text><rect x="670" y="370" width="200" height="56" rx="10" class="bx ui"/><text x="770.0" y="392" class="bt" text-anchor="middle">Màn đăng nhập</text><text x="770.0" y="409" class="ts" text-anchor="middle">signInWithPassword</text><polyline points="590,398 670,398" class="edge" marker-end="url(#mk-bt)"/><text x="630" y="390" class="lbl" text-anchor="middle">Chưa</text><polyline points="450,436 450,470" class="edge" marker-end="url(#mk-bt)"/><text x="458" y="460" class="lbl">Còn</text><rect x="310" y="470" width="280" height="70" rx="10" class="bx lg"/><text x="450.0" y="492" class="bt" text-anchor="middle">loadAll()</text><text x="450.0" y="509" class="ts" text-anchor="middle">backend.load() · 1000 dòng/trang</text><text x="450.0" y="526" class="ts" text-anchor="middle">dữ liệu y hệt → không vẽ lại</text><polyline points="130,249 130,505 310,505" class="edge" marker-end="url(#mk-bt)"/><text x="138" y="380" class="lbl">đọc IndexedDB</text><polyline points="770,426 770,505 590,505" class="edge" marker-end="url(#mk-bt)"/><text x="778" y="470" class="lbl">đăng nhập xong</text><polyline points="450,540 450,574" class="edge" marker-end="url(#mk-bt)"/><polygon points="450,574.0 590.0,612 450,650.0 310.0,612" class="bx nu"/><text x="450" y="608" class="t" text-anchor="middle">Tải được</text><text x="450" y="624" class="t" text-anchor="middle">từ nguồn?</text><rect x="670" y="578" width="200" height="68" rx="10" class="bx lo"/><text x="770.0" y="600" class="bt" text-anchor="middle">Ghi bản sao</text><text x="770.0" y="617" class="ts" text-anchor="middle">để xem khi mất mạng</text><text x="770.0" y="634" class="ts" text-anchor="middle">qltc:cache:‹userId›</text><polyline points="590,612 670,612" class="edge" marker-end="url(#mk-bt)"/><text x="630" y="604" class="lbl" text-anchor="middle">Được</text><rect x="20" y="572" width="220" height="88" rx="10" class="bx lo"/><text x="130.0" y="594" class="bt" text-anchor="middle">Dùng bản sao cũ</text><text x="130.0" y="611" class="ts" text-anchor="middle">offline = true → chỉ xem</text><text x="130.0" y="628" class="ts" text-anchor="middle">chưa có bản sao thì hiện màn</text><text x="130.0" y="645" class="ts" text-anchor="middle">“Không mở được dữ liệu”</text><polyline points="310,612 240,612" class="edge" marker-end="url(#mk-bt)"/><text x="275" y="604" class="lbl" text-anchor="middle">Lỗi</text><rect x="310" y="692" width="280" height="70" rx="10" class="bx st"/><text x="450.0" y="714" class="bt" text-anchor="middle">Nạp S.data</text><text x="450.0" y="731" class="ts" text-anchor="middle">fillAll() · _seed(): 15 danh mục</text><text x="450.0" y="748" class="ts" text-anchor="middle">emit('*')</text><polyline points="130,660 130,727 310,727" class="edge" marker-end="url(#mk-bt)"/><polyline points="770,646 770,727 590,727" class="edge" marker-end="url(#mk-bt)"/><polyline points="450,762 450,792" class="edge" marker-end="url(#mk-bt)"/><rect x="310" y="792" width="280" height="70" rx="10" class="bx ui"/><text x="450.0" y="814" class="bt" text-anchor="middle">start() → route()</text><text x="450.0" y="831" class="ts" text-anchor="middle">vẽ màn theo #hash hiện tại</text><text x="450.0" y="848" class="ts" text-anchor="middle">lắng nghe hashchange, online, N/Q</text><rect x="20" y="794" width="220" height="66" rx="10" class="bx lo"/><text x="130.0" y="816" class="bt" text-anchor="middle">registerSW()</text><text x="130.0" y="833" class="ts" text-anchor="middle">Service Worker qltc-v10</text><text x="130.0" y="850" class="ts" text-anchor="middle">bỏ qua trong APK</text><polyline points="310,827 240,827" class="edge dashed" marker-end="url(#mk-bt)"/><rect x="670" y="794" width="210" height="66" rx="10" class="bx lg"/><text x="775.0" y="816" class="bt" text-anchor="middle">store.on(rerender)</text><text x="775.0" y="833" class="ts" text-anchor="middle">emit → vẽ lại sau 30 ms</text><text x="775.0" y="850" class="ts" text-anchor="middle">giữ vị trí cuộn</text><polyline points="590,827 670,827" class="edge dashed" marker-end="url(#mk-bt)"/></svg></div>
+    <p class="hint">← vuốt ngang để xem hết hình →</p>
+    <figcaption><b>Hình 2.</b> Từ lúc mở đến lúc có màn hình. Hai nhánh “Không có cấu hình” (chế độ thử) và “mất mạng” (bản sao cũ) là hai cách duy nhất app chạy mà không nói chuyện được với Supabase.</figcaption>
+  </figure>
+
+  <h3>Router và vẽ màn hình</h3>
+  <ul>
+    <li>Địa chỉ dạng <code>#/tx</code>, <code>#/debts</code>, <code>#/fx</code>… ánh xạ tới bảng <code>ROUTES</code> gồm 9 màn. Đường dẫn lạ thì về Tổng quan.</li>
+    <li>Máy tính có thanh bên đủ 9 mục; điện thoại có 4 tab (Tổng quan, Giao dịch, Tài khoản, Vay nợ), mục “Khác” cho phần còn lại và nút ＋ nổi. Phím <code>N</code> mở menu thêm, <code>Q</code> mở nhập nhanh.</li>
+    <li>Mỗi khi <code>store</code> phát sự kiện thay đổi, <code>main.js</code> chờ 30 ms (gộp nhiều thay đổi liền nhau) rồi <b>dựng lại toàn bộ màn hiện tại</b>, giữ nguyên vị trí cuộn. Cách này đơn giản và đúng, đổi lại không giữ trạng thái của ô đang gõ; vì vậy bản tải lại giống hệt bản cũ sẽ không kích hoạt vẽ lại.</li>
+    <li>Ba biểu ngữ trên cùng: “Không có mạng”, “Đang xem bản lưu gần nhất (ngoại tuyến)” kèm nút Thử lại, và “Chế độ thử”.</li>
+  </ul>
+
+  <h3>Khi nào dữ liệu được tải lại</h3>
+  <ul>
+    <li>Lúc mở app, và sau khi đăng nhập.</li>
+    <li>Khi quay lại app mà lần tải trước đã quá 30 giây (không làm khi đang mở hộp thoại).</li>
+    <li>Khi thiết bị có mạng trở lại (sự kiện <code>online</code>).</li>
+    <li>Khi bạn bấm “Tải lại” trong Cài đặt hoặc “Thử lại” trên biểu ngữ ngoại tuyến.</li>
+  </ul>
+  <p class="sub">Không có truy vấn định kỳ và không có kênh realtime. Sửa trên điện thoại sẽ hiện ở máy tính khi bạn quay lại tab đó sau 30 giây, hoặc bấm tải lại.</p>
+</div></section>
+
+<section id="luu-tru"><div class="in">
+  <h2><span class="n">04</span>Dữ liệu được lưu ở đâu, dưới dạng nào</h2>
+
+  <h3>Một bảng, chín bộ dữ liệu</h3>
+  <p>Trên Supabase chỉ có một bảng <code>public.records</code>. Mỗi tài khoản, giao dịch, người vay, lệnh đổi tiền… là <b>một dòng</b>; cột <code>collection</code> cho biết nó thuộc loại nào, cột <code>data</code> (jsonb) chứa các trường của nó. Thêm một trường mới vào app không cần sửa cơ sở dữ liệu.</p>
+  <div class="rec" role="table" aria-label="Cấu trúc một dòng records">
+    <div><span class="h">id</span><span class="v">uuid, khóa chính, do trình duyệt tạo</span></div>
+    <div><span class="h">user_id</span><span class="v">tự điền = auth.uid()</span></div>
+    <div><span class="h">collection</span><span class="v">'txs'</span></div>
+    <div><span class="h">data</span><span class="v">jsonb: các trường còn lại</span></div>
+    <div><span class="h">created_at</span><span class="v">giờ tạo</span></div>
+    <div><span class="h">updated_at</span><span class="v">trigger tự cập nhật</span></div>
+  </div>
+<pre><code>// ví dụ minh họa: một dòng collection = 'txs', cột data
+{ "date": "2026-10-03", "kind": "income", "amount": 11000000, "currency": "VND",
+  "accountId": "a1c4…", "categoryId": "c9e2…", "note": "Lương tháng 10", "ts": 1759450000000 }</code></pre>
+  <p style="margin-top:12px">Khi tải, app ghép <code>{ id, ...data }</code> thành một đối tượng; khi lưu, tách <code>id</code> ra cột riêng. Vì <code>id</code> do trình duyệt tạo bằng <code>crypto.randomUUID()</code>, app biết id ngay mà không cần chờ máy chủ, và nhờ đó ghi “lạc quan” được (mục 05).</p>
+
+  <h3>Mọi nơi dữ liệu có thể nằm</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Nơi</th><th>Chứa gì</th><th>Tồn tại bao lâu</th><th>Có phải dữ liệu tiền?</th></tr></thead>
+    <tbody>
+      <tr><td><b>Supabase Postgres</b><br><code>records</code></td><td>Toàn bộ sổ: 9 collection.</td><td>Vĩnh viễn, dùng chung mọi thiết bị.</td><td>Có, đây là nguồn sự thật duy nhất.</td></tr>
+      <tr><td><b>Supabase Auth</b></td><td>Tài khoản đăng nhập (email + mật khẩu).</td><td>Vĩnh viễn.</td><td>Không.</td></tr>
+      <tr><td><b>RAM của app</b><br><code>S.data</code></td><td>Bản làm việc của 9 collection.</td><td>Đến khi đóng hoặc tải lại trang; mở lại thì nạp từ Supabase.</td><td>Có, nhưng chỉ là bản sao tạm.</td></tr>
+      <tr><td><b>IndexedDB</b><br><code>qltc</code> / <code>kv</code></td><td><code>qltc:cache:‹userId›</code>: bản sao toàn bộ để xem khi mất mạng, ghi đè sau mỗi lần tải thành công.<br><code>qltc:local</code>: dữ liệu của chế độ thử.</td><td>Đến khi xóa dữ liệu trình duyệt/app.</td><td>Có. Bản sao ngoại tuyến là chỗ duy nhất trên máy chứa số liệu thật.</td></tr>
+      <tr><td><b>localStorage</b></td><td><code>qltc:theme</code>, <code>qltc:lastAccount</code>, <code>qltc:lastDealAccount</code>, <code>qltc:sharePeople</code>, <code>qltc:shareIncludeMe</code>, <code>qltc:homeSend:‹danhMục›</code>, và token phiên <code>sb-…-auth-token</code> do supabase-js giữ.</td><td>Đến khi xóa dữ liệu trình duyệt/app.</td><td>Không: chỉ là thói quen giao diện và phiên đăng nhập.</td></tr>
+      <tr><td><b>Cache của Service Worker</b><br><code>qltc-v10</code></td><td>Các tệp mã nguồn cùng nguồn (HTML, JS, CSS, biểu tượng).</td><td>Được thay khi đổi số phiên bản trong <code>sw.js</code>.</td><td>Không. Không bao giờ lưu yêu cầu tới Supabase.</td></tr>
+      <tr><td><b>Kho GitHub</b></td><td>Mã nguồn, kiểm thử, tài liệu. <code>config.js</code> chứa địa chỉ và khóa anon công khai.</td><td>Vĩnh viễn.</td><td>Không. Khóa ký APK nằm ở GitHub Secret, không ở kho.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Quan hệ giữa các bộ dữ liệu</h3>
+  <figure>
+    <div class="fig"><svg style="--w:1000px;--minw:880px" viewBox="0 0 1000 548" width="1000" role="img" aria-label="Sơ đồ dữ liệu: chín bộ dữ liệu trong bảng records và các tham chiếu bằng id giữa chúng" xmlns="http://www.w3.org/2000/svg"><defs><marker id="mk-er" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.5 L9 5 L1 8.5 Z" class="mkp"/></marker></defs><rect x="20" y="24" width="230" height="83" rx="10" class="bx st"/><text x="135.0" y="46" class="bt" text-anchor="middle">accounts</text><text x="135.0" y="63" class="ts tm" text-anchor="middle">name · kind · currency</text><text x="135.0" y="80" class="ts tm" text-anchor="middle">opening · networth</text><text x="135.0" y="97" class="ts tm" text-anchor="middle">archived</text><rect x="20" y="170" width="230" height="66" rx="10" class="bx st"/><text x="135.0" y="192" class="bt" text-anchor="middle">parties</text><text x="135.0" y="209" class="ts tm" text-anchor="middle">name · role</text><text x="135.0" y="226" class="ts tm" text-anchor="middle">note</text><rect x="20" y="316" width="230" height="66" rx="10" class="bx st"/><text x="135.0" y="338" class="bt" text-anchor="middle">categories</text><text x="135.0" y="355" class="ts tm" text-anchor="middle">name · type · icon</text><rect x="20" y="450" width="230" height="66" rx="10" class="bx st"/><text x="135.0" y="472" class="bt" text-anchor="middle">budgets</text><text x="135.0" y="489" class="ts tm" text-anchor="middle">categoryId · amount</text><text x="135.0" y="506" class="ts tm" text-anchor="middle">currency</text><rect x="375" y="24" width="250" height="197" rx="10" class="bx lg"/><text x="500.0" y="46" class="bt" text-anchor="middle">txs · giao dịch</text><text x="500.0" y="63" class="ts tm" text-anchor="middle">date · kind · note · ts</text><text x="500.0" y="80" class="ts tm" text-anchor="middle">amount · currency</text><text x="500.0" y="97" class="ts tm" text-anchor="middle">accountId</text><text x="500.0" y="114" class="ts tm" text-anchor="middle">toAccountId · toAmount</text><text x="500.0" y="131" class="ts tm" text-anchor="middle">accountAmount</text><text x="500.0" y="148" class="ts tm" text-anchor="middle">partyId</text><text x="500.0" y="165" class="ts tm" text-anchor="middle">categoryId</text><text x="500.0" y="182" class="ts tm" text-anchor="middle">dealId</text><text x="500.0" y="199" class="ts tm" text-anchor="middle">scholarshipId</text><rect x="375" y="300" width="250" height="83" rx="10" class="bx st"/><text x="500.0" y="322" class="bt" text-anchor="middle">dorm</text><text x="500.0" y="339" class="ts tm" text-anchor="middle">paidDate · amount · payer</text><text x="500.0" y="356" class="ts tm" text-anchor="middle">period · receiptSent</text><rect x="750" y="24" width="230" height="138" rx="10" class="bx st"/><text x="865.0" y="46" class="bt" text-anchor="middle">deals · đổi tiền</text><text x="865.0" y="63" class="ts tm" text-anchor="middle">dir · status · date</text><text x="865.0" y="80" class="ts tm" text-anchor="middle">partyId · inputs · actual</text><text x="865.0" y="97" class="ts tm" text-anchor="middle">profit (VND) · profitTxId</text><text x="865.0" y="114" class="ts tm" text-anchor="middle">profitUnit · profitRate</text><text x="865.0" y="131" class="ts tm" text-anchor="middle">postSkipped</text><rect x="750" y="190" width="230" height="104" rx="10" class="bx st"/><text x="865.0" y="212" class="bt" text-anchor="middle">scholarships</text><text x="865.0" y="229" class="ts tm" text-anchor="middle">month · amount · currency</text><text x="865.0" y="246" class="ts tm" text-anchor="middle">availableDate</text><text x="865.0" y="263" class="ts tm" text-anchor="middle">receivedDate · txId</text><rect x="750" y="340" width="230" height="104" rx="10" class="bx st"/><text x="865.0" y="362" class="bt" text-anchor="middle">settings · 1 tài liệu</text><text x="865.0" y="379" class="ts tm" text-anchor="middle">baseCurrency · hideAmounts</text><text x="865.0" y="396" class="ts tm" text-anchor="middle">rates {RUB, USD, USDT}</text><text x="865.0" y="413" class="ts tm" text-anchor="middle">params {lô, thẻ nhận lãi…}</text><polyline points="375,56 250,56" class="edge" marker-end="url(#mk-er)"/><text x="312" y="49" class="lbl" text-anchor="middle">accountId</text><polyline points="375,92 250,92" class="edge" marker-end="url(#mk-er)"/><text x="312" y="85" class="lbl" text-anchor="middle">toAccountId</text><polyline points="375,188 250,188" class="edge" marker-end="url(#mk-er)"/><text x="312" y="181" class="lbl" text-anchor="middle">partyId</text><polyline points="375,210 312,210 312,349 250,349" class="edge" marker-end="url(#mk-er)"/><text x="322" y="292" class="lbl">categoryId</text><polyline points="135,450 135,382" class="edge" marker-end="url(#mk-er)"/><text x="143" y="420" class="lbl">categoryId</text><polyline points="625,56 750,56" class="edge" marker-end="url(#mk-er)"/><text x="688" y="49" class="lbl" text-anchor="middle">dealId</text><polyline points="750,92 625,92" class="edge" marker-end="url(#mk-er)"/><text x="688" y="85" class="lbl" text-anchor="middle">profitTxId</text><polyline points="625,214 750,214" class="edge" marker-end="url(#mk-er)"/><text x="688" y="207" class="lbl" text-anchor="middle">scholarshipId</text><polyline points="750,238 625,238" class="edge" marker-end="url(#mk-er)"/><text x="688" y="231" class="lbl" text-anchor="middle">txId</text></svg></div>
+    <p class="hint">← vuốt ngang để xem hết hình →</p>
+    <figcaption><b>Hình 3.</b> Mũi tên là tham chiếu bằng id. Đây là quy ước của app, không phải khóa ngoại trong cơ sở dữ liệu: Postgres không ngăn bạn xóa một tài khoản còn giao dịch, nên chính app chỉ hiện nút Xóa với tài khoản chưa có giao dịch (đã dùng thì chỉ cho ẩn). <code>settings</code> chỉ có một tài liệu; <code>params.dealAccountId</code> và <code>params.scholarshipAccountId</code> trỏ tới <code>accounts</code>.</figcaption>
+  </figure>
+
+  <h3>Chế độ thử và sao lưu</h3>
+  <ul>
+    <li><b>Chế độ thử:</b> nếu <code>config.js</code> chưa có địa chỉ và khóa Supabase, app dùng <code>LocalBackend</code>: toàn bộ sổ nằm trong IndexedDB của chính trình duyệt đó, không đăng nhập, không đồng bộ. Cài đặt có nút tạo dữ liệu mẫu (tên và số hoàn toàn bịa).</li>
+    <li><b>Sao lưu:</b> Cài đặt xuất toàn bộ thành một tệp JSON <code>{ app, version: 1, exportedAt, data: {9 collection} }</code>. Nhập có hai kiểu: “Gộp thêm” (ghi đè theo id, giữ phần còn lại) hoặc “Thay toàn bộ” (xóa sạch rồi nhập, có hộp xác nhận).</li>
+  </ul>
+</div></section>
+
+<section id="ghi"><div class="in">
+  <h2><span class="n">05</span>Ghi dữ liệu: một lần lưu đi qua những đâu</h2>
+  <p>Mọi thao tác thêm, sửa, xóa đều đi qua <code>store.put</code>, <code>putMany</code>, <code>del</code> hoặc <code>delMany</code>. Chúng ghi <b>lạc quan</b>: cập nhật RAM và màn hình trước, gửi lên Supabase sau, và hoàn tác nếu máy chủ từ chối. Người dùng thấy kết quả ngay thay vì chờ vòng đi về qua mạng.</p>
+  <figure>
+    <div class="fig"><svg style="--w:900px;--minw:810px" viewBox="0 0 900 500" width="900" role="img" aria-label="Biểu đồ trình tự khi lưu một giao dịch: form gọi store, store cập nhật RAM và màn hình ngay, rồi gửi lên Supabase, nếu lỗi thì hoàn tác" xmlns="http://www.w3.org/2000/svg"><defs><marker id="mk-wr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.5 L9 5 L1 8.5 Z" class="mkp"/></marker></defs><rect x="25" y="16" width="170" height="44" rx="10" class="bx ui"/><text x="110.0" y="38" class="bt" text-anchor="middle">Form / màn hình</text><line x1="110" y1="60" x2="110" y2="484" class="life"/><rect x="245" y="16" width="170" height="44" rx="10" class="bx lg"/><text x="330.0" y="38" class="bt" text-anchor="middle">store.js</text><line x1="330" y1="60" x2="330" y2="484" class="life"/><rect x="485" y="16" width="170" height="44" rx="10" class="bx st"/><text x="570.0" y="38" class="bt" text-anchor="middle">RAM · S.data</text><line x1="570" y1="60" x2="570" y2="484" class="life"/><rect x="705" y="16" width="170" height="44" rx="10" class="bx cl"/><text x="790.0" y="38" class="bt" text-anchor="middle">Supabase · records</text><line x1="790" y1="60" x2="790" y2="484" class="life"/><polyline points="110,98 330,98" class="edge" marker-end="url(#mk-wr)"/><text x="220.0" y="91" class="lbl" text-anchor="middle">1 · put('txs', doc)</text><polyline points="330,140 570,140" class="edge" marker-end="url(#mk-wr)"/><text x="450.0" y="133" class="lbl" text-anchor="middle">2 · thêm/thay bản ghi (id, ts)</text><polyline points="330,182 110,182" class="edge dashed" marker-end="url(#mk-wr)"/><text x="220.0" y="175" class="lbl" text-anchor="middle">3 · emit → vẽ lại sau 30 ms</text><polyline points="330,230 790,230" class="edge" marker-end="url(#mk-wr)"/><text x="560.0" y="223" class="lbl" text-anchor="middle">4 · upsert({id, collection, data})</text><polyline points="790,270 330,270" class="edge dashed" marker-end="url(#mk-wr)"/><text x="560.0" y="263" class="lbl" text-anchor="middle">5 · 200 OK (RLS: user_id = auth.uid())</text><polyline points="330,304 110,304" class="edge dashed" marker-end="url(#mk-wr)"/><text x="220.0" y="297" class="lbl" text-anchor="middle">6 · put() trả về bản ghi</text><rect x="40" y="330" width="820" height="150" rx="14" class="frame nu"/><text x="56" y="354" class="ft">NẾU Supabase báo lỗi (mất mạng, bị từ chối, hết phiên)</text><polyline points="790,386 330,386" class="edge dashed" marker-end="url(#mk-wr)"/><text x="560.0" y="379" class="lbl" text-anchor="middle">7 · lỗi</text><polyline points="330,422 570,422" class="edge" marker-end="url(#mk-wr)"/><text x="450.0" y="415" class="lbl" text-anchor="middle">8 · trả lại bản ghi cũ</text><polyline points="330,458 110,458" class="edge dashed" marker-end="url(#mk-wr)"/><text x="220.0" y="451" class="lbl" text-anchor="middle">9 · vẽ lại + báo lỗi cho form</text></svg></div>
+    <p class="hint">← vuốt ngang để xem hết hình →</p>
+    <figcaption><b>Hình 4.</b> Vòng đời <code>store.put</code>. Bước 2–3 xảy ra trước khi có phản hồi từ mạng; khung dưới là nhánh lỗi.</figcaption>
+  </figure>
+  <ol class="steps">
+    <li><div><b>Kiểm tra được phép ghi.</b> Đang ngoại tuyến thì <code>store</code> ném lỗi “chỉ xem được, chưa ghi được” ngay, chưa đụng vào dữ liệu.</div></li>
+    <li><div><b>Gán id và dấu thời gian</b> (<code>ts</code> = lúc tạo) nếu bản ghi mới, rồi thêm hoặc thay trong <code>S.data</code>. Giữ bản cũ để hoàn tác.</div></li>
+    <li><div><b>Vẽ lại ngay</b> qua <code>emit</code>. Toàn bộ số dư và tổng quan tự cập nhật vì chúng là phép tính trên RAM.</div></li>
+    <li><div><b>Gửi lên Supabase</b> bằng <code>upsert</code> theo <code>id</code> (lô 500 dòng); xóa theo lô 100 id. Postgres kiểm tra chính sách RLS và trigger cập nhật <code>updated_at</code>, giữ nguyên <code>user_id</code>.</div></li>
+    <li><div><b>Nếu lỗi</b> (mất mạng, hết phiên, bị từ chối): trả bản cũ vào RAM, phát <code>emit</code> lần nữa và ném lỗi để form hiện thông báo đỏ. Sổ trở về đúng như trước khi bấm.</div></li>
+  </ol>
+
+  <h3>Một thao tác, nhiều tài liệu liên kết</h3>
+  <p>Một số việc cần ghi nhiều tài liệu cùng lúc. Ví dụ chốt một lệnh đổi tiền và cộng lãi vào thẻ: lãi là một giao dịch trong <code>txs</code>, lệnh là một tài liệu trong <code>deals</code>, hai bên trỏ vào nhau (<code>deal.profitTxId</code> và <code>tx.dealId</code>). Học bổng cũng tương tự (<code>scholarshipId</code> và <code>txId</code>). Khoản “gửi bố” khi nhập một khoản thu cũng sinh thêm một giao dịch chi.</p>
+<pre><code>saveDeal(deal, { post: true, accountId })
+  1. store.put('txs',   khoản lãi)       // thu nếu lãi, chi nếu lỗ; thẻ rúp thì ghi bằng RUB
+  2. store.put('deals', lệnh đã chốt)    // lưu profitTxId trỏ về khoản lãi
+  3. nếu bước 2 lỗi → hoàn tác bước 1    // xóa khoản lãi vừa ghi, hoặc khôi phục bản cũ</code></pre>
+  <div class="note warn"><b class="lab">Giới hạn</b><p>Đây là hai lần ghi riêng, không nằm trong một giao dịch cơ sở dữ liệu. Lỗi mạng được hoàn tác đúng; nhưng nếu app bị tắt đột ngột giữa bước 1 và 2, khoản lãi có thể tồn tại mà lệnh chưa trỏ tới nó. Màn Báo tỉ giá có biểu ngữ “lệnh đã chốt chưa cộng lãi” để bắt các ca như vậy.</p></div>
+
+  <h3>Hai thiết bị cùng sửa</h3>
+  <p><code>put</code> thay <b>cả tài liệu</b> theo id, và bản ghi nào lưu sau thì thắng (last-write-wins). Nếu điện thoại và máy tính cùng sửa một giao dịch trước khi kịp tải lại, bản lưu sau sẽ đè hoàn toàn bản trước, kể cả những trường bên kia không đụng tới. Các bản ghi khác nhau thì không ảnh hưởng nhau. Tài liệu <code>settings</code> là một bản ghi duy nhất nên dễ đụng nhau nhất. Cột <code>updated_at</code> có trên Supabase nhưng app không đọc nó để hòa trộn.</p>
+</div></section>
+
+<section id="so-cai"><div class="in">
+  <h2><span class="n">06</span>Sổ cái: số dư và công nợ là phép tính</h2>
+  <p>Toàn bộ logic nằm trong <code>calc.js</code>, thuần hàm. Nguyên tắc: app chỉ lưu <b>sự kiện</b> (giao dịch) và <b>số dư đầu kỳ</b> của từng tài khoản; mọi con số còn lại được tính lại mỗi lần vẽ.</p>
+  <div class="formulas">
+    <div class="formula"><h3>Số dư tài khoản</h3><pre><code>số dư = opening
+      + Σ ảnh hưởng của
+        từng giao dịch</code></pre><p>Tính theo tiền tệ của chính tài khoản đó.</p></div>
+    <div class="formula"><h3>Công nợ</h3><pre><code>theo từng người
+  × từng tiền tệ
+lend +1  repay_out +1
+repay_in −1  borrow −1</code></pre><p>Dương: họ nợ mình. Âm: mình nợ họ.</p></div>
+    <div class="formula"><h3>Tổng quan</h3><pre><code>tiền thật
++ phải thu
+− phải trả
+(quy VND theo tỷ giá)</code></pre><p>Tài khoản đặt “không tính vào tài sản” bị loại. Thiếu tỷ giá thì app đánh dấu thay vì đoán.</p></div>
+  </div>
+
+  <h3>Mỗi loại giao dịch ảnh hưởng gì</h3>
+  <div class="tw"><table>
+    <thead><tr><th>kind</th><th>Tên</th><th>Tài khoản</th><th>Công nợ với người đó</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag">income</span></td><td>Thu</td><td>+ số tiền</td><td>—</td></tr>
+      <tr><td><span class="tag">expense</span></td><td>Chi</td><td>− số tiền</td><td>—</td></tr>
+      <tr><td><span class="tag">transfer</span></td><td>Chuyển / đổi tiền</td><td>− <code>amount</code> ở tài khoản nguồn, + <code>toAmount</code> (mặc định = <code>amount</code>) ở tài khoản đích; khác tiền tệ thì là đổi ngoại tệ</td><td>—</td></tr>
+      <tr><td><span class="tag">lend</span></td><td>Cho vay</td><td>− số tiền (nếu có tài khoản)</td><td>họ nợ mình <b>+</b></td></tr>
+      <tr><td><span class="tag">repay_in</span></td><td>Được trả nợ</td><td>+ số tiền</td><td>nợ <b>−</b></td></tr>
+      <tr><td><span class="tag">borrow</span></td><td>Đi vay</td><td>+ số tiền</td><td>mình nợ họ (<b>−</b>)</td></tr>
+      <tr><td><span class="tag">repay_out</span></td><td>Trả nợ</td><td>− số tiền</td><td>nợ <b>+</b></td></tr>
+      <tr><td><span class="tag">adjust</span></td><td>Điều chỉnh số dư</td><td>± số tiền (đối soát)</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Ví dụ: lương vào thẻ rồi gửi bố</h3>
+  <p>Thẻ MB có số dư đầu kỳ 1.000.000 ₫. Nhập khoản thu lương 11.000.000 ₫ và chọn gửi bố 8.000.000 ₫: form sinh <b>hai giao dịch</b> (một thu, một chi “Gửi bố” cùng thẻ). Không có chỗ nào lưu “4.000.000”; con số này sinh ra mỗi lần màn hình vẽ.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Dòng</th><th>kind</th><th class="num">Ảnh hưởng thẻ MB</th><th class="num">Số dư sau</th></tr></thead>
+    <tbody>
+      <tr><td>Số dư đầu kỳ (<code>opening</code>)</td><td>—</td><td class="num">1.000.000</td><td class="num">1.000.000</td></tr>
+      <tr><td>Lương tháng 10</td><td><span class="tag">income</span></td><td class="num pos">+11.000.000</td><td class="num">12.000.000</td></tr>
+      <tr><td>Gửi bố</td><td><span class="tag">expense</span></td><td class="num neg">−8.000.000</td><td class="num">4.000.000</td></tr>
+      <tr class="total"><td>Số dư hiện tại</td><td></td><td class="num"></td><td class="num">4.000.000</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Ví dụ: công nợ và khác tiền tệ</h3>
+  <ul>
+    <li>Cho An vay 2.000.000 ₫ (<code>lend</code>, +2.000.000), An trả 500.000 ₫ (<code>repay_in</code>, −500.000): An còn nợ <b>1.500.000 ₫</b>. Nếu cùng lúc bạn vay Bình 300.000 ₫ (<code>borrow</code>), Bình ở trạng thái −300.000: phải thu 1.500.000, phải trả 300.000.</li>
+    <li>Công nợ tính riêng từng tiền tệ, nên một người vừa nợ USD vừa nợ VND không bị cộng chung.</li>
+    <li>Chuyển 3.000.000 ₫ từ thẻ VND sang thẻ rúp nhận 10.000 ₽ là một giao dịch <code>transfer</code> có <code>amount</code> 3.000.000 và <code>toAmount</code> 10.000. Mỗi thẻ cộng trừ theo tiền của chính nó.</li>
+    <li>Khoản vay có thể khác tiền tệ với tài khoản (đổi đô la rồi chuyển đồng cho người vay): <code>amount</code> và <code>currency</code> là khoản nợ, <code>accountAmount</code> là số tiền thật đi ra khỏi thẻ.</li>
+    <li>Tỷ giá trong Cài đặt (1 RUB, USD, USDT = bao nhiêu ₫) <b>chỉ dùng</b> để quy đổi các tổng ở màn Tổng quan, không ảnh hưởng số dư từng thẻ.</li>
+  </ul>
+</div></section>
+
+<section id="man-hinh"><div class="in">
+  <h2><span class="n">07</span>Mỗi màn hình đọc và ghi gì</h2>
+  <p>Các màn chỉ <b>đọc</b> từ <code>store</code>; việc thêm, sửa, xóa giao dịch, tài khoản và người vay đi qua các form dùng chung trong <code>forms.js</code> (mở từ nút ＋ hoặc từ dòng trong danh sách).</p>
+  <div class="tw"><table>
+    <thead><tr><th>Màn</th><th>Địa chỉ</th><th>Tệp</th><th>Đọc</th><th>Ghi trực tiếp</th></tr></thead>
+    <tbody>
+      <tr><td>Tổng quan</td><td><code>#/</code></td><td><code>dashboard.js</code></td><td>accounts, txs, budgets, deals</td><td>Cài đặt (ẩn số tiền)</td></tr>
+      <tr><td>Giao dịch</td><td><code>#/tx</code></td><td><code>transactions.js</code></td><td>txs</td><td>qua form</td></tr>
+      <tr><td>Thu nhập</td><td><code>#/income</code></td><td><code>income.js</code></td><td>txs</td><td>qua form</td></tr>
+      <tr><td>Tài khoản</td><td><code>#/accounts</code></td><td><code>accounts.js</code></td><td>accounts, txs</td><td>qua form</td></tr>
+      <tr><td>Vay nợ</td><td><code>#/debts</code></td><td><code>debts.js</code></td><td>parties, txs</td><td>qua form</td></tr>
+      <tr><td>Báo tỉ giá</td><td><code>#/fx</code></td><td><code>exchange.js</code></td><td>deals (và <code>fx.js</code> để tính)</td><td>deals + khoản lãi trong txs (<code>deals.js</code>)</td></tr>
+      <tr><td>Tiền KTX</td><td><code>#/dorm</code></td><td><code>dorm.js</code></td><td>dorm</td><td>dorm</td></tr>
+      <tr><td>Học bổng MIIGAiK</td><td><code>#/scholarship</code></td><td><code>scholarship.js</code></td><td>scholarships</td><td>scholarships + khoản thu trong txs, cài đặt</td></tr>
+      <tr><td>Cài đặt</td><td><code>#/settings</code></td><td><code>settings.js</code></td><td>accounts, budgets, categories, txs</td><td>budgets, categories, settings; nhập/xuất, dữ liệu mẫu, đăng xuất</td></tr>
+      <tr><td>Đăng nhập</td><td>(thay khung khi chưa có phiên)</td><td><code>login.js</code></td><td>—</td><td>phiên Supabase Auth</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="trien-khai"><div class="in">
+  <h2><span class="n">08</span>Triển khai: từ mã nguồn đến điện thoại</h2>
+  <p>Có hai đường, đều do GitHub Actions chạy, và cả hai đều chạy <code>npm test</code> trước: test hỏng thì không đưa gì ra ngoài.</p>
+  <figure>
+    <div class="fig"><svg style="--w:1000px;--minw:880px" viewBox="0 0 1000 390" width="1000" role="img" aria-label="Đường từ mã nguồn đến người dùng: một nhánh đưa web lên GitHub Pages, một nhánh dựng APK Android" xmlns="http://www.w3.org/2000/svg"><defs><marker id="mk-dp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1.5 L9 5 L1 8.5 Z" class="mkp"/></marker></defs><rect x="200" y="20" width="780" height="150" rx="14" class="frame nu"/><text x="216" y="44" class="ft">ĐƯA WEB LÊN PAGES · tự chạy khi đẩy thay đổi vào web/ trên nhánh main</text><rect x="200" y="210" width="780" height="150" rx="14" class="frame nu"/><text x="216" y="234" class="ft">DỰNG APK · bấm tay trong tab Actions hoặc đẩy tag v*</text><rect x="20" y="64" width="150" height="273" rx="10" class="bx nu"/><text x="95.0" y="86" class="bt" text-anchor="middle">Kho GitHub</text><text x="95.0" y="103" class="ts" text-anchor="middle">nhánh main</text><text x="95.0" y="120" class="ts" text-anchor="middle">web/ · tests/</text><text x="95.0" y="137" class="ts" text-anchor="middle">setup/ · tools/</text><text x="95.0" y="154" class="ts" text-anchor="middle">docs/</text><text x="95.0" y="171" class="ts" text-anchor="middle"></text><text x="95.0" y="188" class="ts" text-anchor="middle">không có dữ liệu,</text><text x="95.0" y="205" class="ts" text-anchor="middle">không có khóa ký</text><rect x="236" y="64" width="160" height="83" rx="10" class="bx lg"/><text x="316.0" y="86" class="bt" text-anchor="middle">Chạy test</text><text x="316.0" y="103" class="ts" text-anchor="middle">npm test · 84 bài</text><text x="316.0" y="120" class="ts" text-anchor="middle">lỗi thì dừng</text><rect x="424" y="64" width="160" height="83" rx="10" class="bx lg"/><text x="504.0" y="86" class="bt" text-anchor="middle">Gói thư mục web/</text><text x="504.0" y="103" class="ts" text-anchor="middle">config.js lấy từ biến</text><text x="504.0" y="120" class="ts" text-anchor="middle">kho nếu đã đặt</text><rect x="612" y="64" width="160" height="83" rx="10" class="bx cl"/><text x="692.0" y="86" class="bt" text-anchor="middle">GitHub Pages</text><text x="692.0" y="103" class="ts" text-anchor="middle">phục vụ tệp tĩnh</text><text x="692.0" y="120" class="ts" text-anchor="middle">không chứa dữ liệu</text><rect x="800" y="64" width="160" height="83" rx="10" class="bx ui"/><text x="880.0" y="86" class="bt" text-anchor="middle">Trình duyệt / PWA</text><text x="880.0" y="103" class="ts" text-anchor="middle">mở là lấy mã mới</text><text x="880.0" y="120" class="ts" text-anchor="middle">mất mạng: dùng bản lưu</text><rect x="236" y="254" width="160" height="83" rx="10" class="bx lg"/><text x="316.0" y="276" class="bt" text-anchor="middle">Test + cài thư viện</text><text x="316.0" y="293" class="ts" text-anchor="middle">npm test</text><text x="316.0" y="310" class="ts" text-anchor="middle">npm install</text><rect x="424" y="254" width="160" height="83" rx="10" class="bx lg"/><text x="504.0" y="276" class="bt" text-anchor="middle">Tạo dự án Android</text><text x="504.0" y="293" class="ts" text-anchor="middle">cap add · assets</text><text x="504.0" y="310" class="ts" text-anchor="middle">cap sync (chép web/)</text><rect x="612" y="254" width="160" height="83" rx="10" class="bx lg"/><text x="692.0" y="276" class="bt" text-anchor="middle">Ký và dựng APK</text><text x="692.0" y="293" class="ts" text-anchor="middle">versionCode = lần chạy</text><text x="692.0" y="310" class="ts" text-anchor="middle">khóa ký lấy từ secret</text><rect x="800" y="254" width="160" height="83" rx="10" class="bx ui"/><text x="880.0" y="276" class="bt" text-anchor="middle">app-debug.apk</text><text x="880.0" y="293" class="ts" text-anchor="middle">tải về, chép sang máy</text><text x="880.0" y="310" class="ts" text-anchor="middle">cài đè bản cũ</text><polyline points="396,105 424,105" class="edge" marker-end="url(#mk-dp)"/><polyline points="396,295 424,295" class="edge" marker-end="url(#mk-dp)"/><polyline points="584,105 612,105" class="edge" marker-end="url(#mk-dp)"/><polyline points="584,295 612,295" class="edge" marker-end="url(#mk-dp)"/><polyline points="772,105 800,105" class="edge" marker-end="url(#mk-dp)"/><polyline points="772,295 800,295" class="edge" marker-end="url(#mk-dp)"/><polyline points="170,105 236,105" class="edge" marker-end="url(#mk-dp)"/><text x="203" y="97" class="lbl" text-anchor="middle">push</text><polyline points="170,295 236,295" class="edge" marker-end="url(#mk-dp)"/><text x="203" y="287" class="lbl" text-anchor="middle">chạy</text></svg></div>
+    <p class="hint">← vuốt ngang để xem hết hình →</p>
+    <figcaption><b>Hình 5.</b> Đường web tự chạy khi bạn đẩy thay đổi trong <code>web/</code> hoặc <code>tests/</code> lên nhánh <code>main</code>; đường APK chạy khi bạn bấm tay hoặc gắn tag <code>v*</code>.</figcaption>
+  </figure>
+  <ul>
+    <li><b>Web cập nhật gần như ngay.</b> Sau khi Pages triển khai xong, trình duyệt lấy mã mới ở lần mở kế tiếp: Service Worker ưu tiên mạng, chỉ rơi về bản lưu khi mất mạng. Mỗi lần đổi danh sách tệp, tăng số phiên bản <code>qltc-vN</code> trong <code>sw.js</code>.</li>
+    <li><b>APK mang theo bản sao của <code>web/</code> lúc dựng.</b> Đổi giao diện hay logic thì phải dựng APK mới; dữ liệu thì không nằm trong APK nên cài đè không mất gì. APK không đăng ký Service Worker (Capacitor đã bundle sẵn tệp).</li>
+    <li><b>Cài đè được</b> nhờ khóa ký cố định (nạp từ GitHub Secret <code>DEBUG_KEYSTORE_BASE64</code>, kiểm tra bằng <code>keytool</code>) và <code>versionCode</code> bằng số lần chạy workflow nên luôn tăng.</li>
+    <li><b>Cấu hình:</b> nếu kho có biến <code>SUPABASE_URL</code> và <code>SUPABASE_ANON_KEY</code>, cả hai workflow ghi đè <code>web/config.js</code> lúc dựng; không có thì dùng tệp trong git.</li>
+    <li><b>Ghi chú vận hành:</b> thư mục <code>.github/workflows</code> được bảo vệ nên bản gốc nằm ở <code>setup/github-workflows/</code>; sửa ở đó rồi chạy <code>npm run setup:workflows</code> để chép sang.</li>
+  </ul>
+</div></section>
+
+<section id="bao-mat"><div class="in">
+  <h2><span class="n">09</span>Bảo mật</h2>
+  <ul>
+    <li><b>Đăng nhập:</b> email + mật khẩu qua Supabase Auth, đăng ký công khai đã tắt. Token phiên nằm trong localStorage do supabase-js quản lý và tự gia hạn.</li>
+    <li><b>Row Level Security:</b> bốn chính sách (xem, thêm, sửa, xóa) cho vai trò <code>authenticated</code>, đều với điều kiện <code>user_id = auth.uid()</code>. Quyền của vai trò <code>anon</code> bị thu hết. <code>user_id</code> tự điền khi thêm, và trigger không cho đổi chủ một dòng.</li>
+    <li><b>Khóa anon công khai</b> trong <code>config.js</code> là thiết kế bình thường của Supabase: không có phiên đăng nhập thì nó không đọc được dòng nào. Khóa quyền cao (<code>service_role</code>) không bao giờ được đặt trong mã web.</li>
+    <li><b>Chính sách nội dung (CSP)</b> trong <code>index.html</code> chỉ cho chạy script từ chính nguồn app và chỉ cho kết nối ra <code>https</code> hoặc <code>wss</code>.</li>
+    <li><b>Dữ liệu trên đường truyền</b> đi qua HTTPS. Khóa ký APK nằm ở GitHub Secret và một bản sao riêng của bạn, không nằm trong kho.</li>
+  </ul>
+  <div class="note warn"><b class="lab">Cần biết</b><p>Bản sao ngoại tuyến trong IndexedDB không được mã hóa. Ai mở được điện thoại hoặc hồ sơ trình duyệt đang đăng nhập của bạn đều xem được sổ. Chức năng “ẩn số tiền” chỉ che số trên màn hình, không bảo vệ dữ liệu.</p></div>
+</div></section>
+
+<section id="danh-doi"><div class="in">
+  <h2><span class="n">10</span>Đánh đổi và giới hạn đã chấp nhận</h2>
+  <p>Mỗi lựa chọn dưới đây làm app đơn giản hơn cho một người dùng với vài nghìn bản ghi, và có một cái giá. Khi quy mô hoặc cách dùng đổi, đây là những chỗ cần xem lại trước.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Lựa chọn</th><th>Được gì</th><th>Giá phải trả</th></tr></thead>
+    <tbody>
+      <tr><td><b>Tải hết dữ liệu vào RAM</b></td><td>Tính nhanh, không cần máy chủ, xem được khi mất mạng.</td><td>Mỗi lần mở và làm mới đều tải lại tất cả. Hàng chục nghìn dòng sẽ bắt đầu chậm.</td></tr>
+      <tr><td><b>Một bảng JSON cho mọi thứ</b></td><td>Thêm trường không cần đổi cơ sở dữ liệu.</td><td>Không có khóa ngoại hay ràng buộc ở tầng dữ liệu; báo cáo bằng SQL khó viết.</td></tr>
+      <tr><td><b>Ngoại tuyến chỉ xem</b></td><td>Không bao giờ phải giải quyết xung đột ghi.</td><td>Mất mạng thì không nhập được gì.</td></tr>
+      <tr><td><b>Bản ghi sau đè bản ghi trước</b></td><td>Rất đơn giản, đủ cho một người dùng.</td><td>Hai thiết bị cùng sửa một bản ghi chưa tải lại thì mất thay đổi của bên lưu trước.</td></tr>
+      <tr><td><b>Không realtime, không truy vấn định kỳ</b></td><td>Ít phức tạp, tiết kiệm pin và mạng.</td><td>Thiết bị kia chỉ thấy thay đổi sau 30 giây hoặc khi bấm tải lại.</td></tr>
+      <tr><td><b>Liên kết tài liệu xử lý ở máy khách</b></td><td>Không cần viết mã máy chủ.</td><td>Không có giao dịch cơ sở dữ liệu thật: tắt app đúng lúc giữa hai lần ghi có thể để lại tài liệu lệch nhau.</td></tr>
+      <tr><td><b>Số dư luôn tính ra</b></td><td>Không thể lệch khỏi sổ giao dịch.</td><td>Sửa hay xóa giao dịch cũ đổi số dư hiện tại ngay (đúng ý, nhưng cần đối soát bằng giao dịch <code>adjust</code>).</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+
+<section id="tep"><div class="in">
+  <h2><span class="n">11</span>Bản đồ tệp</h2>
+  <div class="map">
+    <div class="dir"><h3>web/</h3><dl>
+      <dt>index.html</dt><dd>Trang duy nhất, khai báo CSP</dd>
+      <dt>config.js</dt><dd>Địa chỉ Supabase + khóa anon</dd>
+      <dt>sw.js</dt><dd>Service Worker (cache qltc-v10)</dd>
+      <dt>manifest.webmanifest</dt><dd>Cài như ứng dụng</dd>
+      <dt>css/app.css</dt><dd>Toàn bộ kiểu dáng, sáng/tối</dd>
+      <dt>icons/</dt><dd>Logo và biểu tượng</dd>
+      <dt>vendor/supabase.js</dt><dd>Thư viện Supabase (chép sẵn)</dd>
+    </dl></div>
+    <div class="dir"><h3>web/js/</h3><dl>
+      <dt>main.js</dt><dd>Khởi động, router, khung</dd>
+      <dt>store.js</dt><dd>Kho dữ liệu + 2 backend</dd>
+      <dt>model.js</dt><dd>Collection, mặc định, uid()</dd>
+      <dt>calc.js</dt><dd>Số dư, nợ, thống kê</dd>
+      <dt>fx.js</dt><dd>Công thức báo giá sang/về</dd>
+      <dt>deals.js</dt><dd>Chốt lệnh, lãi vào thẻ</dd>
+      <dt>scholarship.js</dt><dd>Học bổng → khoản thu</dd>
+      <dt>share.js</dt><dd>Chia tiền, gửi người nhà</dd>
+      <dt>quickadd.js</dt><dd>Nhập nhanh nhiều khoản</dd>
+      <dt>money.js, dates.js</dt><dd>Tiền tệ, đọc “25k”, ngày tháng</dd>
+      <dt>forms.js, components.js</dt><dd>Form và thành phần dùng chung</dd>
+      <dt>ui.js, theme.js</dt><dd>h(), hộp thoại, biểu đồ; giao diện sáng/tối</dd>
+      <dt>demo.js</dt><dd>Dữ liệu mẫu bịa</dd>
+    </dl></div>
+    <div class="dir"><h3>web/js/screens/</h3><dl>
+      <dt>dashboard.js</dt><dd>Tổng quan</dd>
+      <dt>transactions.js</dt><dd>Giao dịch</dd>
+      <dt>income.js</dt><dd>Thu nhập</dd>
+      <dt>accounts.js</dt><dd>Tài khoản</dd>
+      <dt>debts.js</dt><dd>Vay nợ</dd>
+      <dt>exchange.js</dt><dd>Báo tỉ giá + chốt giao dịch</dd>
+      <dt>dorm.js</dt><dd>Tiền KTX</dd>
+      <dt>scholarship.js</dt><dd>Học bổng MIIGAiK</dd>
+      <dt>settings.js</dt><dd>Cài đặt, sao lưu</dd>
+      <dt>login.js</dt><dd>Đăng nhập</dd>
+    </dl></div>
+    <div class="dir"><h3>Ngoài web/</h3><dl>
+      <dt>supabase/schema.sql</dt><dd>Bảng records, RLS, trigger (chạy một lần)</dd>
+      <dt>tests/</dt><dd>84 bài kiểm thử Node (calc, deals, fx, money, quickadd, scholarship, share, assets)</dd>
+      <dt>setup/github-workflows/</dt><dd>Bản gốc của pages.yml và android.yml</dd>
+      <dt>tools/</dt><dd>Nhập từ Excel cũ, chép workflow, tạo logo/icon</dd>
+      <dt>assets/</dt><dd>Ảnh nguồn để Capacitor tạo icon Android</dd>
+      <dt>docs/</dt><dd>THIET_KE.md, HUONG_DAN_CAI_DAT.md và trang này</dd>
+      <dt>capacitor.config.json</dt><dd>appId, webDir, androidScheme</dd>
+    </dl></div>
+  </div>
+</div></section>
+
+</main>
+
+<footer><div class="in">
+  <p>Trang này mô tả mã nguồn ngày 16/10/2026 (Service Worker cache <code>qltc-v10</code>, 84 bài kiểm thử đạt). Khi cấu trúc thay đổi, cập nhật <code>docs/THIET_KE.md</code> và trang này cùng lúc. Ví dụ số trong trang là số minh họa, không phải dữ liệu thật.</p>
+</div></footer>
+
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('#toc a'));
+  var map={};links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var secs=[].slice.call(document.querySelectorAll('main > section'));
+  if(!('IntersectionObserver' in window)||!secs.length)return;
+  var cur=null;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){cur=e.target.id;links.forEach(function(a){a.removeAttribute('aria-current');});
+        var a=map[cur];if(a){a.setAttribute('aria-current','true');
+          var box=a.parentNode;var l=a.offsetLeft-box.clientWidth/2+a.offsetWidth/2;box.scrollTo?box.scrollTo({left:l}):0;}}
+    });
+  },{rootMargin:'-20% 0px -70% 0px'});
+  secs.forEach(function(s){io.observe(s);});
+})();
+</script>
+</body>
+</html>
