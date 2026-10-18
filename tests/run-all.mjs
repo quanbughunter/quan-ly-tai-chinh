@@ -8,3 +8,4 @@ import './scholarship.test.js';
 import './share.test.js';
 import './assets.test.js';
 import './quickadd.test.js';
+import './backnav.test.js';

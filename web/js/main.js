@@ -1,8 +1,9 @@
 // Điểm vào của ứng dụng: khởi động kho dữ liệu, định tuyến theo hash, khung điều hướng.
 
-import { h, svg, modal, toast, errMsg, debounce, $ } from './ui.js';
+import { h, svg, modal, toast, errMsg, debounce, closeTopModal, $ } from './ui.js';
 import { store } from './store.js';
 import { applyTheme } from './theme.js';
+import { installBackButton } from './backnav.js';
 import { openTxForm, openQuickAdd } from './forms.js';
 import { renderLogin } from './screens/login.js';
 import * as dashboard from './screens/dashboard.js';
@@ -191,6 +192,9 @@ function showFatal(app, e) {
 
 async function boot() {
   applyTheme();
+  // Mục lịch sử đầu tiên luôn là '#/': bấm tab Tổng quan khi đang ở Tổng quan không tạo thêm một bước Back "chết".
+  if (!location.hash) { try { history.replaceState(null, '', '#/'); } catch { /* bỏ qua */ } }
+  installBackButton({ closeTopModal });
   const app = $('#app');
   const cfg = window.APP_CONFIG || {};
   try {

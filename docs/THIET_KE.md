@@ -210,6 +210,7 @@ GitHub Actions ── dựng APK debug bằng Capacitor, xuất file tải về
 - **Ngoại tuyến:** sau lần tải đầu, app lưu bản sao để mở được khi mất mạng (chỉ xem). Ghi dữ liệu yêu cầu có mạng.
 - **Hai thiết bị cùng sửa:** bản ghi nào sửa sau thì thắng (đủ dùng cho một người).
 - **Chế độ thử:** nếu chưa cấu hình Supabase, app chạy bằng dữ liệu trên máy để bạn thử ngay.
+- **Nút Back (vuốt cạnh) trên Android:** Capacitor 6 không tự xử lý nút Back; thiếu plugin `@capacitor/app` thì Android đóng luôn app, kể cả khi đang mở form. App cài plugin này và nghe sự kiện `backButton` (`web/js/backnav.js`): đóng hộp thoại trên cùng → lùi về màn trước (lịch sử `#hash`) → ở màn đầu thì thu app xuống nền. Vì có thêm plugin gốc nên phải dựng APK mới; bản web trong trình duyệt giữ nguyên nút Back của trình duyệt.
 
 ### Logo và icon
 

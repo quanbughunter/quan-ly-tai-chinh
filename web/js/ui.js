@@ -60,6 +60,16 @@ export function errMsg(e) {
 }
 
 /* ───────── Hộp thoại ───────── */
+const openModals = []; // các hộp thoại đang mở, cái mới nhất ở cuối (để nút Back của Android đóng từng lớp)
+
+/** Đóng hộp thoại trên cùng. Trả true nếu có hộp để đóng. */
+export function closeTopModal() {
+  const top = openModals[openModals.length - 1];
+  if (!top) return false;
+  top.close();
+  return true;
+}
+
 export function modal({ title, body, actions = [], wide = false, onClose }) {
   const overlay = h('div', { class: 'overlay', onclick: (e) => { if (e.target === overlay) close(); } });
   const sheet = h('div', { class: `sheet${wide ? ' wide' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
@@ -72,7 +82,12 @@ export function modal({ title, body, actions = [], wide = false, onClose }) {
   document.addEventListener('keydown', onKey);
   document.body.append(overlay);
   document.body.classList.add('modal-open');
+  const entry = { close: () => close() };
+  openModals.push(entry);
   function close() {
+    const i = openModals.indexOf(entry);
+    if (i < 0) return; // đã đóng rồi: không chạy onClose lần hai
+    openModals.splice(i, 1);
     document.removeEventListener('keydown', onKey);
     overlay.remove();
     if (!document.querySelector('.overlay')) document.body.classList.remove('modal-open');
