@@ -387,10 +387,14 @@ a.row:hover, button.row:hover { background: var(--surface-2); text-decoration: n
 /* ───────── Máy tính đổi tiền ───────── */
 .calc-out { margin-top: 4px; padding: 10px 14px; background: var(--surface-2); border-radius: 16px; border: 1px solid var(--line); }
 .calc-row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 14px; }
-.calc-row span { color: var(--muted); }
+.calc-row span { color: var(--muted); min-width: 0; }
+.calc-row b { white-space: nowrap; }
 .calc-row.big b { font-size: 18px; }
 .calc-row.good b { color: var(--mint-ink); }
 .calc-row.bad b { color: var(--rose-ink); }
+.calc-row.minor { font-size: 13px; padding: 1px 0 5px; }
+.calc-row.minor span { padding-left: 10px; }
+.calc-note { padding: 0 0 4px; font-size: 12px; }
 
 /* ───────── Nhập nhanh ───────── */
 .qa-list { display: flex; flex-direction: column; gap: 8px; }

@@ -110,12 +110,18 @@ Mọi tỷ giá lưu theo đơn vị tự nhiên (ví dụ 26.000 VND/USDT, khô
 **Chiều `sang`** (khách đưa VND, bên Nga nhận RUB). `D` = số VND khách đưa, `E` = lãi mong muốn.
 - Giá báo (VND/RUB) = `(VND/USDT ÷ RUB/USDT) ÷ (1 − E ÷ cỡ lô sang)`; cỡ lô sang mặc định 1.200.000 VND (trong sheet: `1000*E/1200000`, `E` tính bằng nghìn VND)
 - RUB phải trả = `D ÷ giá báo`
-- Thực tế: USDT cần bán = `RUB trả ÷ giá bán RUB/USDT`; VND bỏ ra = `USDT × giá mua VND/USDT`; **lãi thực = D − VND bỏ ra**
+- Thực tế (giá thực khi đi mua / bán USDT): USDT cần mua = `RUB trả ÷ giá bán thực RUB/USDT`; **VND đi mua USDT** = `USDT × giá mua thực VND/USDT`; **lãi thực = D − VND đi mua USDT**; tỉ giá thực (VND/RUB) = `giá mua thực ÷ giá bán thực`
 
 **Chiều `về`** (khách đưa RUB, nhận VND).
 - Giá báo (VND/RUB) = `VND/USDT ÷ RUB/USDT − E ÷ cỡ lô về`; cỡ lô về mặc định 5.000 RUB (trong sheet: `1000*E/5000`)
 - VND phải trả khách = `giá báo × RUB nhận`
-- Thực tế: VND thu về = `RUB nhận ÷ RUB/USDT thực × VND/USDT thực`; **lãi thực = VND thu về − VND trả khách**
+- Thực tế: USDT mua được = `RUB nhận ÷ giá mua thực RUB/USDT`; VND thu về = `USDT × giá bán thực VND/USDT`; **lãi thực = VND thu về − VND trả khách**; tỉ giá thực (VND/RUB) = `giá bán thực ÷ giá mua thực`
+
+**Màn hình Báo tỉ giá hiện đủ hai tầng ngay trong máy tính** (không cần mở hộp Chốt mới thấy):
+1. *Giá báo*: 4 ô nhập → giá báo, RUB phải trả (sang) hoặc VND trả khách (về), lãi dự kiến.
+2. *Giá thực khi đi mua / bán USDT*: 2 ô nhập → **tỉ giá thực** (kèm chênh so với giá báo, xanh nếu có lợi cho mình), **số USDT**, **số VND đi mua USDT** (sang) hoặc **VND thu về** (về), **lãi thực** (= khách đưa − tiền mua USDT; = thu về − trả khách) và chênh so với lãi dự kiến. Hai ô giá thực hiện giá báo mờ làm gợi ý; chỉ nhập một ô thì ô còn lại tạm lấy theo giá báo (app ghi chú rõ). Hai tầng này nhất quán: sang `lãi thực = RUB trả × (giá báo − tỉ giá thực)`, về `lãi thực = RUB nhận × (tỉ giá thực − giá báo)`.
+
+Bấm «✓ Chốt giao dịch» thì giá thực đã nhập được mang sang hộp chốt và tự điền ô lãi ghi nhận. Logic nằm ở `evalDeal` (fx.js, hàm thuần, có test).
 
 Đây là cách mình hiểu ý nghĩa của `E` qua công thức (lãi mong muốn trên một lô chuẩn); phần cỡ lô là hằng số, nên đưa vào Cài đặt chứ không để chôn trong công thức. Mục 8 liệt kê các điểm cần bạn xác nhận.
 
@@ -128,7 +134,7 @@ Nhiều khách chỉ hỏi giá rồi không giao dịch, nên **báo giá khôn
 | `quote` — Báo giá | Đã tính giá cho khách, chưa chắc làm | Không |
 | `done` — Đã chốt | Giao dịch thật sự xảy ra | Lãi được ghi **một khoản thu** vào thẻ nhận lãi (mặc định thẻ MB) **đúng ngày của lệnh** |
 
-- Lãi ghi nhận = lãi thực tính từ giá thực tế (điền khi chốt); nếu chưa có giá thực tế thì lấy lãi theo giá báo (`sang`: VND × lãi ÷ cỡ lô; `về`: RUB × lãi ÷ cỡ lô). Bạn luôn sửa được số này. Lãi âm (lỗ) được ghi thành một khoản chi.
+- Lãi ghi nhận = lãi thực tính từ giá thực tế (điền khi chốt); nếu chưa nhập giá thực nào thì lấy lãi theo giá báo (`sang`: VND × lãi ÷ cỡ lô; `về`: RUB × lãi ÷ cỡ lô). Bạn luôn sửa được số này. Lãi âm (lỗ) được ghi thành một khoản chi.
 - Khoản lãi trong sổ gắn với lệnh qua `dealId`/`profitTxId`: **sửa** lệnh thì khoản lãi tự cập nhật, **hủy chốt** hoặc **xóa** lệnh thì khoản lãi tự biến mất, số dư luôn khớp. Khoản này không sửa tay ở màn hình Giao dịch (app dẫn bạn về lệnh gốc).
 - **Thẻ nhận lãi** là tùy chọn của từng lệnh: hộp «Chốt giao dịch» có ô chọn **bất kỳ thẻ nào** (thẻ MB, thẻ rúp, thẻ của người khác…) và nút «＋ Thẻ mới» để tạo thẻ ngay tại đó. Thẻ được gợi ý sẵn theo thứ tự: thẻ đặt trong Cài đặt → thẻ bạn chọn ở lần chốt trước (nhớ trên máy này; chỉ khi Cài đặt để «Nhớ thẻ lần chốt trước») → thẻ VND có tên chứa "MB" → thẻ VND đầu tiên → thẻ bất kỳ. Có thể bỏ tick "Cộng lãi vào thẻ" cho từng lệnh.
 - **Lãi theo đơn vị và tỉ giá áng chừng.** Lãi của lệnh (`deal.profit`) luôn lưu bằng **VND** để thống kê, nhưng khi chốt bạn chọn được đơn vị nhập lãi (₫ hoặc ₽/ngoại tệ của thẻ) và, khi cần quy đổi, điền **tỉ giá áng chừng** (₫ cho 1 đơn vị ngoại tệ):

@@ -84,3 +84,75 @@ test('suggestedProfit: ưu tiên lãi thực, không có thì lấy lãi lý thu
   assert.ok(real.value > 300_000);
   assert.equal(suggestedProfit({ dir: 'sang', inputs: {}, actual: {} }).value, null);
 });
+
+// ── Tỉ giá thực, tiền đi mua USDT, lãi thực ──
+
+const SANG = { dir: 'sang', inputs: { vndAmount: 6_000_000, vndPerUsdt: 26000, rubPerUsdt: 80, margin: 60_000 } };
+const VE = { dir: 've', inputs: { rubAmount: 4000, rubPerUsdt: 80, vndPerUsdt: 26500, margin: 100_000 } };
+
+test('sang: tỉ giá thực = giá mua USDT ÷ giá bán USDT; lãi thực = khách đưa − tiền mua USDT', () => {
+  const r = evalDeal({ ...SANG, actual: { buyVndPerUsdt: 25900, sellRubPerUsdt: 82 } }).real;
+  near(r.realRate, 25900 / 82); // 315,85 ₫/RUB, thấp hơn giá báo 342,11
+  near(r.vndIn, 6_000_000);
+  near(r.vndCost, 5539587.242026267); // 213,88 USDT × 25.900
+  near(r.profit, r.vndIn - r.vndCost);
+  assert.deepEqual(r.assumed, []);
+});
+
+test('sang: lãi thực = số RUB phải trả × (giá báo − tỉ giá thực)', () => {
+  const ev = evalDeal({ ...SANG, actual: { buyVndPerUsdt: 25900, sellRubPerUsdt: 82 } });
+  near(ev.real.profit, ev.quote.rubPay * (ev.quote.quote - ev.real.realRate));
+  near(ev.real.rateEdge, ev.quote.quote - ev.real.realRate);
+  near(ev.real.vsQuote, ev.real.profit - 300_000);
+});
+
+test('sang: chỉ nhập giá mua USDT thì giá bán RUB tạm lấy theo giá báo', () => {
+  const r = evalDeal({ ...SANG, actual: { buyVndPerUsdt: 26100 } }).real;
+  assert.deepEqual(r.assumed, ['sellRubPerUsdt']);
+  assert.equal(r.used.sellRubPerUsdt, 80);
+  near(r.realRate, 26100 / 80);
+  // mua đắt hơn giá báo (26.100 > 26.000) nên lãi thấp hơn lãi dự kiến
+  assert.ok(r.profit < 300_000);
+  assert.ok(r.rateEdge > 0 && r.vsQuote < 0);
+});
+
+test('sang: không nhập ô giá thực nào thì chưa có kết quả thực', () => {
+  assert.equal(evalDeal({ ...SANG, actual: {} }).real, null);
+  assert.equal(evalDeal({ ...SANG, actual: { buyVndPerUsdt: 0, sellRubPerUsdt: NaN } }).real, null);
+});
+
+test('sang: nhập giá thực đúng bằng giá báo thì lãi thực = lãi dự kiến', () => {
+  const r = evalDeal({ ...SANG, actual: { buyVndPerUsdt: 26000, sellRubPerUsdt: 80 } }).real;
+  near(r.profit, 300_000);
+  near(r.vsQuote, 0);
+});
+
+test('về: tỉ giá thực = giá bán USDT ÷ giá mua USDT; lãi thực = VND thu về − VND trả khách', () => {
+  const ev = evalDeal({ ...VE, actual: { actualRubPerUsdt: 78, actualVndPerUsdt: 26300 } });
+  const r = ev.real;
+  near(r.realRate, 26300 / 78);
+  near(r.vndOut, 1_245_000);
+  near(r.profit, r.vndCollected - r.vndOut);
+  near(r.profit, VE.inputs.rubAmount * (r.realRate - ev.quote.quote)); // RUB khách đưa × (tỉ giá thực − giá báo)
+  near(r.rateEdge, r.realRate - ev.quote.quote);
+  near(r.vsQuote, r.profit - 80_000);
+});
+
+test('về: chỉ nhập giá bán USDT lấy VND thì giá mua bằng RUB tạm lấy theo giá báo', () => {
+  const r = evalDeal({ ...VE, actual: { actualVndPerUsdt: 26300 } }).real;
+  assert.deepEqual(r.assumed, ['actualRubPerUsdt']);
+  assert.equal(r.used.actualRubPerUsdt, 80);
+  near(r.usdt, 4000 / 80);
+});
+
+test('chưa có số tiền khách đưa thì chưa tính được kết quả thực', () => {
+  const noAmount = { dir: 'sang', inputs: { vndPerUsdt: 26000, rubPerUsdt: 80, margin: 60_000 }, actual: { buyVndPerUsdt: 25900, sellRubPerUsdt: 82 } };
+  assert.equal(evalDeal(noAmount).real, null);
+  assert.equal(suggestedProfit(noAmount).value, null);
+});
+
+test('suggestedProfit: một ô giá thực cũng đủ để ra lãi thực', () => {
+  const s = suggestedProfit({ ...SANG, actual: { buyVndPerUsdt: 26100 } });
+  assert.equal(s.source, 'real');
+  near(s.value, evalDeal({ ...SANG, actual: { buyVndPerUsdt: 26100 } }).real.profit);
+});

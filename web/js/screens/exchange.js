@@ -27,9 +27,10 @@ const FIELDS = {
       ['rubPerUsdt', 'Giá báo: RUB / USDT', ''],
       ['margin', 'Lãi mong muốn (VND mỗi lô)', 'VND'],
     ],
+    // [khóa, nhãn, đơn vị, loại giá (rub / vnd), tên ngắn để nhắc trong ghi chú]
     actual: [
-      ['sellRubPerUsdt', 'Thực tế: bán USDT được (RUB / USDT)'],
-      ['buyVndPerUsdt', 'Thực tế: mua USDT hết (VND / USDT)'],
+      ['buyVndPerUsdt', 'Giá thực: mua USDT bằng VND (VND / USDT)', '', 'vnd', 'giá mua USDT bằng VND'],
+      ['sellRubPerUsdt', 'Giá thực: bán USDT lấy RUB (RUB / USDT)', '', 'rub', 'giá bán USDT lấy RUB'],
     ],
   },
   ve: {
@@ -40,18 +41,21 @@ const FIELDS = {
       ['margin', 'Lãi mong muốn (VND mỗi lô)', 'VND'],
     ],
     actual: [
-      ['actualRubPerUsdt', 'Thực tế: mua USDT bằng RUB (RUB / USDT)'],
-      ['actualVndPerUsdt', 'Thực tế: bán USDT lấy VND (VND / USDT)'],
+      ['actualRubPerUsdt', 'Giá thực: mua USDT bằng RUB (RUB / USDT)', '', 'rub', 'giá mua USDT bằng RUB'],
+      ['actualVndPerUsdt', 'Giá thực: bán USDT lấy VND (VND / USDT)', '', 'vnd', 'giá bán USDT lấy VND'],
     ],
   },
 };
 
 const num = (v) => (Number.isFinite(v) && v > 0 ? v : undefined);
+const signed = (n, dec = 0) => `${n > 0 ? '+' : ''}${fmtNum(n, dec)}`;
 const amountOf = (dir, inputs) => (dir === 'sang' ? inputs.vndAmount : inputs.rubAmount);
 
 /**
  * Bảng nhập + kết quả tính trực tiếp.
- *  inputsEl: các ô giá báo + kết quả báo giá.  actualEl: các ô giá thực tế + lãi thực (chỉ dùng khi chốt).
+ *  inputsEl: các ô giá báo + kết quả báo giá.
+ *  actualEl: các ô giá thực khi đi mua / bán USDT + tỉ giá thực, tiền đi mua USDT và lãi thực.
+ *  Ô giá thực bỏ trống thì tạm lấy theo giá báo (ô hiện giá báo mờ làm gợi ý).
  */
 function dealEditor({ dir, inputs = {}, actual = {}, params, onChange }) {
   const ctls = {};
@@ -61,7 +65,9 @@ function dealEditor({ dir, inputs = {}, actual = {}, params, onChange }) {
 
   const draw = (box, list, empty) => {
     if (!list.length) { box.replaceChildren(h('div', { class: 'sub' }, empty || '')); return; }
-    box.replaceChildren(...list.map(([k, v, c]) => h('div', { class: `calc-row ${c || ''}` }, h('span', {}, k), h('b', { class: 'mono' }, v))));
+    box.replaceChildren(...list.map((row) => (typeof row === 'string'
+      ? h('div', { class: 'sub calc-note' }, row)
+      : h('div', { class: `calc-row ${row[2] || ''}` }, h('span', {}, row[0]), h('b', { class: 'mono' }, row[1])))));
   };
 
   function get() {
@@ -89,13 +95,41 @@ function dealEditor({ dir, inputs = {}, actual = {}, params, onChange }) {
     }
     draw(outQ, rows, 'Nhập đủ giá và lãi để có giá báo.');
     const real = [];
-    if (r.real) {
-      real.push(['USDT giao dịch', `${fmtNum(r.real.usdt, 4)} USDT`]);
-      if (dir === 'sang') real.push(['VND bỏ ra', `${fmtNum(r.real.vndCost, 0)} ₫`]);
-      else real.push(['VND thu về', `${fmtNum(r.real.vndCollected, 0)} ₫`]);
-      real.push(['Lãi thực', `${fmtNum(r.real.profit, 0)} ₫`, r.real.profit >= 0 ? 'good' : 'bad']);
+    const R = r.real;
+    if (R) {
+      const gl = (x) => (x >= 0 ? 'good' : 'bad');
+      if (dir === 'sang') {
+        real.push(['Tỉ giá thực', `${fmtNum(R.realRate, 2)} ₫ / RUB`, 'big']);
+        real.push(['Chênh so với giá báo', `${signed(R.rateEdge, 2)} ₫ / RUB`, `minor ${gl(R.rateEdge)}`]);
+        real.push(['USDT cần mua', `${fmtNum(R.usdt, 4)} USDT`]);
+        real.push(['Cần mua USDT bằng', `${fmtNum(R.vndCost, 0)} ₫`, 'big']);
+        real.push(['Khách đưa', `${fmtNum(R.vndIn, 0)} ₫`]);
+        real.push(['Lãi thực', `${signed(R.profit, 0)} ₫`, `big ${gl(R.profit)}`]);
+        real.push('= khách đưa − tiền mua USDT');
+      } else {
+        real.push(['Tỉ giá thực', `${fmtNum(R.realRate, 2)} ₫ / RUB`, 'big']);
+        real.push(['Chênh so với giá báo', `${signed(R.rateEdge, 2)} ₫ / RUB`, `minor ${gl(R.rateEdge)}`]);
+        real.push(['USDT mua được', `${fmtNum(R.usdt, 4)} USDT`]);
+        real.push(['Bán USDT thu về', `${fmtNum(R.vndCollected, 0)} ₫`, 'big']);
+        real.push(['VND trả khách', `${fmtNum(R.vndOut, 0)} ₫`]);
+        real.push(['Lãi thực', `${signed(R.profit, 0)} ₫`, `big ${gl(R.profit)}`]);
+        real.push('= VND thu về − VND trả khách');
+      }
+      if (R.vsQuote != null) real.push(['So với lãi dự kiến', `${signed(R.vsQuote, 0)} ₫`, `minor ${gl(R.vsQuote)}`]);
+      if (R.assumed.length) {
+        const names = FIELDS[dir].actual.filter((f) => R.assumed.includes(f[0])).map((f) => `${f[4]} (${fmtNum(R.used[f[0]], 2)})`);
+        real.push(`Chưa nhập ${names.join(' và ')} → tạm lấy theo giá báo.`);
+      }
     }
-    draw(outR, real, 'Điền hai ô giá thực tế để thấy lãi thực (có thể bỏ trống).');
+    draw(outR, real, dir === 'sang'
+      ? 'Nhập giá thực mua USDT bằng VND và bán USDT lấy RUB để thấy tỉ giá thực, số VND đi mua USDT và lãi thực.'
+      : 'Nhập giá thực mua USDT bằng RUB và bán USDT lấy VND để thấy tỉ giá thực, số VND thu về và lãi thực.');
+    // ô giá thực để trống: hiện giá báo mờ cho biết app sẽ tạm lấy số nào
+    const qi = get().inputs;
+    for (const [k, , , kind] of FIELDS[dir].actual) {
+      const quoted = kind === 'rub' ? qi.rubPerUsdt : qi.vndPerUsdt;
+      ctls[k].input.placeholder = quoted ? fmtNum(quoted, 2) : '0';
+    }
     return r;
   }
 
@@ -104,16 +138,16 @@ function dealEditor({ dir, inputs = {}, actual = {}, params, onChange }) {
     paint();
     if (onChange) onChange();
   };
-  const mk = ([key, label, unit], source) => {
+  const mk = ([key, label, unit], source, hint) => {
     const ctl = moneyInput({ value: source[key] ?? '', currency: unit || '', onChange: recalc });
     ctls[key] = ctl;
-    return field(label, ctl.el);
+    return field(label, ctl.el, hint);
   };
 
   const inputsEl = h('div', { class: 'form' }, FIELDS[dir].inputs.map((f) => mk(f, inputs)), outQ);
   const actualEl = h('div', { class: 'form' },
-    h('div', { class: 'divider' }, 'Giá thực tế khi giao dịch xong'),
-    FIELDS[dir].actual.map((f) => mk(f, actual)), outR);
+    h('div', { class: 'divider' }, 'Giá thực khi đi mua / bán USDT'),
+    FIELDS[dir].actual.map((f) => mk(f, actual, 'Có thể bỏ trống — lúc đó tạm lấy theo giá báo.')), outR);
   building = false;
   paint();
   return { inputsEl, actualEl, get };
@@ -142,13 +176,13 @@ export function render(root) {
   let editor;
   const drawCalc = () => {
     editor = dealEditor({ dir, inputs: defaultsFor(dir, params), params });
-    calcHost.replaceChildren(editor.inputsEl);
+    calcHost.replaceChildren(editor.inputsEl, editor.actualEl);
   };
   const start = (confirm) => {
     const v = editor.get();
     const q = dir === 'sang' ? quoteSang({ ...v.inputs, lot: params.lotSang }) : quoteVe({ ...v.inputs, lot: params.lotVe });
     if (!q || !amountOf(dir, v.inputs)) return toast('Nhập đủ giá báo và số tiền khách đưa trước.', 'error');
-    openDealForm({ dir, inputs: v.inputs, actual: {} }, { confirm });
+    openDealForm({ dir, inputs: v.inputs, actual: v.actual }, { confirm });
   };
   root.append(card('Máy tính báo giá', h('div', {},
     seg(DIRS, dir, (v) => { dir = v; drawCalc(); }),
@@ -156,7 +190,7 @@ export function render(root) {
     h('div', { class: 'btn-row' },
       h('button', { class: 'btn', type: 'button', onclick: () => start(false) }, 'Lưu báo giá'),
       h('button', { class: 'btn primary', type: 'button', onclick: () => start(true) }, '✓ Chốt giao dịch')),
-    h('p', { class: 'field-hint' }, 'Khách chỉ hỏi giá thì bấm “Lưu báo giá” — chưa tính lãi. Chỉ khi chốt, lãi mới được cộng vào thẻ.')),
+    h('p', { class: 'field-hint' }, 'Khách chỉ hỏi giá thì chỉ cần phần giá báo rồi bấm “Lưu báo giá”. Sau khi đi mua / bán USDT xong, nhập giá thực để thấy lãi thực rồi bấm “Chốt giao dịch” — chỉ khi chốt, lãi mới được cộng vào thẻ.')),
   { right: h('span', { class: 'sub' }, `Lô: ${fmtNum(params.lotSang)} ₫ · ${fmtNum(params.lotVe)} ₽`) }));
   drawCalc();
 
@@ -343,8 +377,8 @@ export function openDealForm(d0, { confirm = false } = {}) {
     const u = st.unit === 'VND' ? 'VND' : st.unit;
     hint.textContent = st.manual
       ? 'Bạn đã tự nhập số lãi.'
-      : s.source === 'real' ? 'Tự tính từ giá thực tế. Sửa số này nếu lãi thật khác.'
-        : s.source === 'quote' ? 'Đang lấy lãi theo giá báo — điền giá thực tế bên trên để tính chính xác.'
+      : s.source === 'real' ? 'Tự tính từ giá thực. Sửa số này nếu lãi thật khác.'
+        : s.source === 'quote' ? 'Đang lấy lãi theo giá báo — nhập giá thực bên trên để tính chính xác.'
           : `Nhập lãi thực nhận (${u}).`;
     resetBtn.hidden = !(st.manual && s.value != null);
   }
@@ -447,7 +481,6 @@ export function openDealForm(d0, { confirm = false } = {}) {
   refreshSummary();
 
   const confirmHost = h('div', { class: 'form confirm-box' },
-    editor.actualEl,
     h('div', { class: 'field' },
       h('span', { class: 'field-label' }, 'Lãi ghi nhận (âm nếu lỗ)'),
       unitHost, profitCtl.el, fxCtl.el, hint, resetBtn),
@@ -465,6 +498,7 @@ export function openDealForm(d0, { confirm = false } = {}) {
       field('Ngày giao dịch', h('input', { type: 'date', value: st.date, onchange: (e) => { st.date = e.target.value; } })),
       field('Khách', h('div', { class: 'row-inline' }, pSel, h('button', { class: 'btn small', type: 'button', onclick: () => openPartyForm({ role: 'customer', onSaved: (p) => { st.partyId = p.id; pSel.replaceChildren(...partyOptions(null, '— Không chọn —').map((o) => h('option', { value: o.value, selected: o.value === p.id }, o.label))); } }) }, '＋')))),
     editor.inputsEl,
+    editor.actualEl,
     confirmHost,
     field('Ghi chú', h('input', { type: 'text', value: st.note, oninput: (e) => { st.note = e.target.value; } })));
 
@@ -497,7 +531,7 @@ export function openDealForm(d0, { confirm = false } = {}) {
     const doc = buildDoc();
     if (!doc) return;
     const typed = activeCtl().get();
-    if (!Number.isFinite(typed)) return toast('Nhập số lãi (hoặc điền giá thực tế để tự tính).', 'error');
+    if (!Number.isFinite(typed)) return toast('Nhập số lãi (hoặc nhập giá thực để tự tính).', 'error');
     if (st.post && !st.accountId) return toast('Chọn thẻ để cộng lãi.', 'error');
     const cardCur = st.post ? curOf(st.accountId) : 'VND';
     const conv = convertProfit({ amount: typed, unit: st.unit, cardCurrency: cardCur, rate: rateNum() });

@@ -24,12 +24,18 @@ export function quoteSang({ vndPerUsdt, rubPerUsdt, vndAmount, margin, lot = DEF
   return { base, quote, rubPay, theoreticalProfit, rubForRef: refVnd / quote };
 }
 
-/** Kết quả thực tế chiều "sang": bán USDT lấy RUB, mua USDT bằng VND. */
+/**
+ * Kết quả thực tế chiều "sang": mua USDT bằng VND, bán USDT lấy RUB trả bên Nga.
+ *  USDT cần mua  = RUB phải trả ÷ giá bán thực (RUB/USDT)
+ *  VND đi mua    = USDT × giá mua thực (VND/USDT)
+ *  lãi thực      = VND khách đưa − VND đi mua USDT
+ *  tỉ giá thực   = VND đi mua ÷ RUB phải trả (VND/RUB) — để so với giá báo
+ */
 export function realizedSang({ vndAmount, rubPay, sellRubPerUsdt, buyVndPerUsdt }) {
   if (!pos(rubPay) || !pos(sellRubPerUsdt) || !pos(buyVndPerUsdt)) return null;
   const usdt = rubPay / sellRubPerUsdt;
   const vndCost = usdt * buyVndPerUsdt;
-  return { usdt, vndCost, profit: vndAmount - vndCost };
+  return { usdt, vndCost, vndIn: Number(vndAmount) || 0, realRate: buyVndPerUsdt / sellRubPerUsdt, profit: (Number(vndAmount) || 0) - vndCost };
 }
 
 /**
@@ -48,30 +54,53 @@ export function quoteVe({ rubPerUsdt, vndPerUsdt, rubAmount, margin, lot = DEFAU
   return { base, quote, vndPay, theoreticalProfit, rubForRef: refVnd / quote };
 }
 
-/** Kết quả thực tế chiều "về". */
+/**
+ * Kết quả thực tế chiều "về": dùng RUB khách đưa mua USDT, bán USDT lấy VND trả khách.
+ *  USDT mua được = RUB khách đưa ÷ giá mua thực (RUB/USDT)
+ *  VND thu về    = USDT × giá bán thực (VND/USDT)
+ *  lãi thực      = VND thu về − VND trả khách
+ *  tỉ giá thực   = giá bán thực ÷ giá mua thực (VND/RUB)
+ */
 export function realizedVe({ rubAmount, vndPay, actualRubPerUsdt, actualVndPerUsdt }) {
   if (!pos(rubAmount) || !pos(actualRubPerUsdt) || !pos(actualVndPerUsdt)) return null;
   const usdt = rubAmount / actualRubPerUsdt;
   const vndCollected = usdt * actualVndPerUsdt;
-  return { usdt, vndCollected, profit: vndCollected - (vndPay || 0) };
+  return { usdt, vndCollected, vndOut: vndPay || 0, realRate: actualVndPerUsdt / actualRubPerUsdt, profit: vndCollected - (vndPay || 0) };
 }
 
-/** Tính lại toàn bộ một lệnh đổi tiền từ dữ liệu đã nhập. */
+/**
+ * Tính lại toàn bộ một lệnh đổi tiền từ dữ liệu đã nhập.
+ * Giá thực chỉ điền một ô thì ô còn lại tạm lấy theo giá báo (real.assumed ghi lại ô nào bị thay thế).
+ * real.rateEdge = giá báo − tỉ giá thực (sang) hoặc tỉ giá thực − giá báo (về): dương là có lợi cho mình.
+ * real.vsQuote  = lãi thực − lãi dự kiến theo giá báo.
+ */
 export function evalDeal(deal, params = {}) {
   const lots = { ...DEFAULT_LOTS, ...params };
   const i = deal.inputs || {};
   const a = deal.actual || {};
-  if (deal.dir === 'sang') {
-    const q = quoteSang({ ...i, lot: lots.lotSang, refVnd: lots.refVnd });
-    const r = q && q.rubPay != null && (a.sellRubPerUsdt || a.buyVndPerUsdt)
-      ? realizedSang({ vndAmount: i.vndAmount, rubPay: q.rubPay, sellRubPerUsdt: a.sellRubPerUsdt, buyVndPerUsdt: a.buyVndPerUsdt })
-      : null;
-    return { quote: q, real: r, profit: r ? r.profit : null };
+  const dir = deal.dir === 'sang' ? 'sang' : 've';
+  // hai ô giá thực: một ô tính bằng RUB/USDT, một ô bằng VND/USDT; ô bỏ trống tạm lấy theo giá báo cùng loại
+  const rubKey = dir === 'sang' ? 'sellRubPerUsdt' : 'actualRubPerUsdt';
+  const vndKey = dir === 'sang' ? 'buyVndPerUsdt' : 'actualVndPerUsdt';
+  const fallback = { [rubKey]: i.rubPerUsdt, [vndKey]: i.vndPerUsdt };
+  const q = dir === 'sang'
+    ? quoteSang({ ...i, lot: lots.lotSang, refVnd: lots.refVnd })
+    : quoteVe({ ...i, lot: lots.lotVe, refVnd: lots.refVnd });
+  const amountReady = q && (dir === 'sang' ? q.rubPay != null : q.vndPay != null);
+  let r = null;
+  if (amountReady && (pos(a[rubKey]) || pos(a[vndKey]))) {
+    const rub = pos(a[rubKey]) ? Number(a[rubKey]) : Number(fallback[rubKey]);
+    const vnd = pos(a[vndKey]) ? Number(a[vndKey]) : Number(fallback[vndKey]);
+    r = dir === 'sang'
+      ? realizedSang({ vndAmount: i.vndAmount, rubPay: q.rubPay, sellRubPerUsdt: rub, buyVndPerUsdt: vnd })
+      : realizedVe({ rubAmount: i.rubAmount, vndPay: q.vndPay, actualRubPerUsdt: rub, actualVndPerUsdt: vnd });
+    if (r) {
+      r.assumed = [rubKey, vndKey].filter((k) => !pos(a[k]));
+      r.used = { [rubKey]: rub, [vndKey]: vnd };
+      r.rateEdge = dir === 'sang' ? q.quote - r.realRate : r.realRate - q.quote;
+      r.vsQuote = q.theoreticalProfit != null ? r.profit - q.theoreticalProfit : null;
+    }
   }
-  const q = quoteVe({ ...i, lot: lots.lotVe, refVnd: lots.refVnd });
-  const r = q && q.vndPay != null && (a.actualRubPerUsdt || a.actualVndPerUsdt)
-    ? realizedVe({ rubAmount: i.rubAmount, vndPay: q.vndPay, actualRubPerUsdt: a.actualRubPerUsdt, actualVndPerUsdt: a.actualVndPerUsdt })
-    : null;
   return { quote: q, real: r, profit: r ? r.profit : null };
 }
 
