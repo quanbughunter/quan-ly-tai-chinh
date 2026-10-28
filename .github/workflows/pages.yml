@@ -1,0 +1,75 @@
+name: Đưa web lên GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.js'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Chạy test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+
+  deploy:
+    name: Đưa lên Pages
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Cài thư viện
+        run: npm ci --no-audit --no-fund
+
+      # Tùy chọn: nếu đã tạo biến kho SUPABASE_URL và SUPABASE_ANON_KEY (Settings → Secrets and variables → Actions → Variables)
+      # thì ghi đè web/public/config.js lúc build — khỏi phải sửa file trong git. Khóa "anon" vốn công khai nên dùng Variables là đủ.
+      - name: Ghi config.js từ biến kho (nếu có)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            node -e "require('fs').writeFileSync('web/public/config.js','window.APP_CONFIG = '+JSON.stringify({supabaseUrl:process.env.SUPABASE_URL,supabaseAnonKey:process.env.SUPABASE_ANON_KEY})+';\n')"
+            echo "Đã ghi config.js từ biến kho."
+          else
+            echo "Không có biến kho — dùng web/public/config.js trong git."
+          fi
+
+      - name: Dựng giao diện (Vite → thư mục dist)
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

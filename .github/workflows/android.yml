@@ -1,0 +1,96 @@
+name: Dựng APK Android
+
+# Chạy tay: tab Actions → "Dựng APK Android" → Run workflow. Hoặc đẩy một tag dạng v1.0.0.
+# APK nằm ở mục Artifacts của lần chạy (tải về, giải nén, cài lên điện thoại).
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    name: Dựng APK debug
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cài thư viện
+        run: npm ci --no-audit --no-fund
+
+      - name: Chạy test
+        run: npm test
+
+      - name: Ghi config.js từ biến kho (nếu có)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            node -e "require('fs').writeFileSync('web/public/config.js','window.APP_CONFIG = '+JSON.stringify({supabaseUrl:process.env.SUPABASE_URL,supabaseAnonKey:process.env.SUPABASE_ANON_KEY})+';\n')"
+          fi
+
+      - name: Dựng giao diện (Vite → thư mục dist, đây là webDir của Capacitor)
+        run: npm run build
+
+      - name: Tạo dự án Android (thư mục android/ không lưu trong git)
+        run: npx cap add android
+
+      - name: Tạo icon và màn hình khởi động từ assets/
+        run: npx capacitor-assets generate --android
+
+      - name: Đồng bộ giao diện đã dựng (dist/) vào dự án Android
+        run: npx cap sync android
+
+      # Số phiên bản tăng dần theo số lần chạy workflow (1.0.<số lần chạy>), để Android nhận ra đây là bản mới hơn.
+      - name: Đánh số phiên bản theo lần chạy
+        env:
+          RUN: ${{ github.run_number }}
+        run: |
+          sed -i "s/versionCode 1\$/versionCode $RUN/; s/versionName \"1.0\"/versionName \"1.0.$RUN\"/" android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
+          grep -q "versionCode $RUN\$" android/app/build.gradle || echo "::warning::Không đổi được versionCode (mẫu Capacitor có thể đã đổi)."
+
+      # Khóa ký cố định: để cài đè bản mới lên bản cũ mà không phải gỡ app, mọi bản APK phải ký bằng CÙNG một khóa.
+      # Tạo khóa một lần (cần JDK trên máy bạn):
+      #   keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+      #   base64 -w0 debug.keystore      (Windows PowerShell: [Convert]::ToBase64String([IO.File]::ReadAllBytes("debug.keystore")))
+      # rồi dán chuỗi vào secret DEBUG_KEYSTORE_BASE64 (Settings → Secrets and variables → Actions → Secrets).
+      # TUYỆT ĐỐI không đưa file khóa vào kho mã (kho này công khai).
+      - name: Dùng khóa ký cố định (nếu có)
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            mkdir -p ~/.android
+            echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+            keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey > /dev/null \
+              || { echo "::error::DEBUG_KEYSTORE_BASE64 không đọc được (dán thiếu/thừa ký tự?)."; exit 1; }
+            echo "Đã dùng khóa ký cố định."
+          else
+            echo "::warning::Không có DEBUG_KEYSTORE_BASE64 — mỗi lần dựng sẽ có chữ ký khác (cài bản mới cần gỡ bản cũ)."
+          fi
+
+      - name: Dựng APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quan-ly-tai-chinh-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
