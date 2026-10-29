@@ -13,3 +13,4 @@ android/
 # File APK/zip tải về từ GitHub Actions — không đưa lên kho
 *.apk
 quan-ly-tai-chinh-apk.zip
+ezPDF/
