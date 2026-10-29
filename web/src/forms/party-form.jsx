@@ -4,18 +4,34 @@ import { store } from '@/lib/store-hooks.js';
 import { PARTY_ROLES } from '@logic/model.js';
 import { openDialog, useDialog, confirmBox } from '@/lib/dialogs.jsx';
 import { toast } from '@/lib/toast.js';
-import { errMsg } from '@/lib/format.js';
+import { errMsg, money } from '@/lib/format.js';
+import { partyUsage, deleteParty } from '@logic/partydel.js';
 import { Modal } from '@/components/ui/modal.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Field } from '@/components/ui/field.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Select } from '@/components/ui/select.jsx';
 
+/** Nội dung hộp xác nhận khi người đã có giao dịch: nói rõ sẽ mất gì và số dư thẻ đổi thế nào. */
+function deleteWarning(p, u) {
+  const owes = Object.entries(u.balance).map(([cur, v]) => (v > 0
+    ? `${p.name} đang nợ mình ${money(v, cur)}`
+    : `mình đang nợ ${p.name} ${money(-v, cur)}`));
+  const lines = [
+    `“${p.name}” đã có ${u.txs.length} giao dịch${u.deals.length ? ` và ${u.deals.length} lệnh đổi tiền` : ''}.`,
+    owes.length ? `Vay nợ hiện tại: ${owes.join('; ')}.` : 'Vay nợ hiện tại: đã tất toán.',
+    '',
+  ];
+  if (u.txs.length) lines.push(`Xóa người này sẽ xóa luôn ${u.txs.length} giao dịch đó. Số dư các thẻ liên quan được tính lại như thể các khoản này chưa từng có.`);
+  if (u.deals.length) lines.push('Lệnh đổi tiền được giữ nguyên, chỉ bỏ tên người.');
+  lines.push('Không hoàn tác được. Nên xuất sao lưu trong Cài đặt trước nếu chưa chắc.');
+  return lines.join('\n');
+}
+
 function PartyForm({ party: p, opts }) {
   const { close } = useDialog();
   const [st, setSt] = useState(() => ({ name: p ? p.name : '', role: p ? p.role || 'person' : opts.role || 'person', note: p ? p.note || '' : '' }));
   const patch = (x) => setSt((s) => ({ ...s, ...x }));
-  const used = p ? (store.all('txs').some((t) => t.partyId === p.id) || store.all('deals').some((d) => d.partyId === p.id)) : false;
 
   async function onSave() {
     if (!st.name.trim()) return toast('Nhập tên.', 'error');
@@ -28,8 +44,17 @@ function PartyForm({ party: p, opts }) {
   }
 
   async function onDelete() {
-    if (!(await confirmBox(`Xóa “${p.name}”?`, { okLabel: 'Xóa', danger: true }))) return;
-    try { await store.del('parties', p.id); close(); toast('Đã xóa.', 'ok'); if (opts.onDeleted) opts.onDeleted(); } catch (e) { toast(errMsg(e), 'error'); }
+    const u = partyUsage(p.id, { txs: store.all('txs'), deals: store.all('deals') });
+    const ok = u.used
+      ? await confirmBox(deleteWarning(p, u), { okLabel: 'Xóa cả giao dịch', danger: true, title: 'Xóa người và giao dịch?' })
+      : await confirmBox(`Xóa “${p.name}”?`, { okLabel: 'Xóa', danger: true });
+    if (!ok) return;
+    try {
+      await deleteParty(store, p.id);
+      close();
+      toast(u.txs.length ? `Đã xóa ${p.name} và ${u.txs.length} giao dịch.` : 'Đã xóa.', 'ok');
+      if (opts.onDeleted) opts.onDeleted();
+    } catch (e) { toast(errMsg(e), 'error'); }
   }
 
   return (
@@ -39,7 +64,7 @@ function PartyForm({ party: p, opts }) {
       onSubmit={onSave}
       footer={(
         <>
-          {p && !used ? <Button variant="ghost" className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onDelete}><Trash2 />Xóa</Button> : null}
+          {p ? <Button variant="ghost" className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onDelete}><Trash2 />Xóa</Button> : null}
           <Button variant="ghost" onClick={close}>Hủy</Button>
           <Button type="submit"><Check />Lưu</Button>
         </>

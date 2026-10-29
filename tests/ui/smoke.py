@@ -196,6 +196,51 @@ async def main():
         check('console sạch (Back)', not pg.logs, pg.logs[:3])
         await pg.context.close()
 
+        # ── Xóa người vay nợ (kể cả khi đã có giao dịch) ─────────────────
+        pg = await new_page(b, {'width': 390, 'height': 844})
+        await seed(pg)
+        await pg.evaluate("window.__qltc.store.put('parties', { name: 'Người thử', role: 'person' })")
+        info = await pg.evaluate("""() => {
+          const s = window.__qltc.store;
+          const cnt = (id) => s.all('txs').filter(t => t.partyId === id).length;
+          const withTx = s.all('parties').find(p => cnt(p.id) > 0);
+          const lone = s.all('parties').find(p => cnt(p.id) === 0 && !s.all('deals').some(d => d.partyId === p.id));
+          return { id: withTx.id, name: withTx.name, n: cnt(withTx.id), total: s.all('txs').length, loneId: lone ? lone.id : null, loneName: lone ? lone.name : null };
+        }""")
+        await goto(pg, 'debts/' + info['id'])
+        await pg.get_by_role('button', name='Sửa').first.click()
+        await pg.wait_for_timeout(500)
+        check('người đã có giao dịch: nút Xóa vẫn hiện', await pg.get_by_role('button', name='Xóa', exact=True).count() == 1)
+        await pg.get_by_role('button', name='Xóa', exact=True).click()
+        await pg.wait_for_timeout(500)
+        txt = await pg.locator('[role=dialog]').last.inner_text()
+        check('hộp xác nhận nêu số giao dịch và hậu quả', f"{info['n']} giao dịch" in txt and 'Không hoàn tác' in txt and 'Vay nợ hiện tại' in txt, txt[:200])
+        await pg.get_by_role('button', name='Hủy').last.click()
+        await pg.wait_for_timeout(400)
+        check('bấm Hủy: người vẫn còn', await pg.evaluate("window.__qltc.store.byId('parties', %r) != null" % info['id']))
+        await pg.get_by_role('button', name='Xóa', exact=True).click()
+        await pg.wait_for_timeout(400)
+        await pg.get_by_role('button', name='Xóa cả giao dịch').click()
+        await pg.wait_for_timeout(900)
+        after = await pg.evaluate("""(id) => { const s = window.__qltc.store; return { has: s.byId('parties', id) != null, left: s.all('txs').filter(t => t.partyId === id).length, total: s.all('txs').length }; }""", info['id'])
+        check('đã xóa người và các giao dịch của họ', not after['has'] and after['left'] == 0 and after['total'] == info['total'] - info['n'], (after, info))
+        check('xóa xong quay về danh sách Vay nợ', pg.url.endswith('#/debts'), pg.url)
+        page_text = await pg.evaluate("(() => { const c = document.body.cloneNode(true); c.querySelectorAll('[data-sonner-toaster]').forEach(e => e.remove()); return c.textContent; })()")
+        check('tên người biến mất khỏi danh sách (trừ thông báo)', info['name'] not in page_text)
+        if info['loneId']:
+            await goto(pg, 'debts/' + info['loneId'])
+            await pg.get_by_role('button', name='Sửa').first.click()
+            await pg.wait_for_timeout(400)
+            await pg.get_by_role('button', name='Xóa', exact=True).click()
+            await pg.wait_for_timeout(400)
+            t2 = await pg.locator('[role=dialog]').last.inner_text()
+            check('người chưa có giao dịch: hộp xác nhận đơn giản', 'Không hoàn tác' not in t2 and info['loneName'] in t2, t2[:120])
+            await pg.get_by_role('button', name='Xóa', exact=True).last.click()
+            await pg.wait_for_timeout(700)
+            check('người chưa có giao dịch xóa được', not await pg.evaluate("window.__qltc.store.byId('parties', %r) != null" % info['loneId']))
+        check('console sạch (xóa người)', not pg.logs, pg.logs[:3])
+        await pg.context.close()
+
         # ── Máy tính 1280×800 ──────────────────────────────────────────────
         pg = await new_page(b, {'width': 1280, 'height': 800}, scheme='dark')
         await seed(pg)

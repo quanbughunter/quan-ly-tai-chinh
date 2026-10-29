@@ -10,3 +10,4 @@ import './assets.test.js';
 import './quickadd.test.js';
 import './backnav.test.js';
 import './quicksave.test.js';
+import './partydel.test.js';
