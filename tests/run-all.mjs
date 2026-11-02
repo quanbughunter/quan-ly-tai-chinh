@@ -11,3 +11,4 @@ import './quickadd.test.js';
 import './backnav.test.js';
 import './quicksave.test.js';
 import './partydel.test.js';
+import './calcpad.test.js';

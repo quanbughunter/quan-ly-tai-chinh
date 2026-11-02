@@ -37,7 +37,7 @@ function DormForm({ d }) {
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    const v = readAmount(amount);
+    const v = readAmount(amount, currency);
     if (!(v > 0)) return toast('Nhập số tiền lớn hơn 0.', 'error');
     setSaving(true);
     try {

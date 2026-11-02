@@ -241,6 +241,96 @@ async def main():
         check('console sạch (xóa người)', not pg.logs, pg.logs[:3])
         await pg.context.close()
 
+        # ── Máy tính trong ô nhập tiền (+ − × ÷ ( ), k / tr, bàn phím) ─────
+        pg = await new_page(b, {'width': 390, 'height': 844})
+        await seed(pg)
+        await goto(pg, '')
+        await pg.evaluate("window.__qltc.forms.openTxForm({ group: 'expense' })")
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        inp = d.locator('input[placeholder="0"]').first
+        await inp.fill('45k*3')
+        check('gõ 45k*3 hiện = 135.000 ₫', '= 135.000 ₫' in await d.inner_text())
+        await inp.fill('2tr/3')
+        check('2tr/3 làm tròn đồng: = 666.667 ₫', '= 666.667 ₫' in await d.inner_text())
+        await inp.fill('(2tr+500k)/5')
+        check('ngoặc: (2tr+500k)/5 = 500.000 ₫', '= 500.000 ₫' in await d.inner_text())
+        await inp.fill('12+x')
+        check('biểu thức sai báo không đọc được', 'Không đọc được số tiền' in await d.inner_text())
+        await inp.fill('')
+        await d.get_by_test_id('calc-toggle').first.click()
+        await pg.wait_for_timeout(250)
+        pad = d.get_by_test_id('calc-pad').first
+        check('nút máy tính mở bàn phím', await pad.count() == 1 and await inp.get_attribute('inputmode') == 'none')
+        for k in ['4', '5', 'k', '×', '3']:
+            await pad.locator(f'[data-key="{k}"]').click()
+        check('bấm 4 5 k × 3 ra "45k×3" và = 135.000 ₫', await inp.input_value() == '45k×3' and '= 135.000 ₫' in await d.inner_text(), await inp.input_value())
+        await pad.locator('[data-key="="]').click()
+        check('phím = đổi biểu thức thành số 135000', await inp.input_value() == '135000')
+        await pad.locator('[data-key="clear"]').click()
+        for k in ['2', 'tr', '+', '5', '0', '0', 'k']:
+            await pad.locator(f'[data-key="{k}"]').click()
+        check('2tr + 500k = 2.500.000 ₫', '= 2.500.000 ₫' in await d.inner_text())
+        await pad.locator('[data-key="done"]').click()
+        check('Xong đóng bàn phím', await d.get_by_test_id('calc-pad').count() == 0)
+        await inp.fill('45k*3')
+        before = await txs(pg)
+        await d.get_by_role('button', name='Lưu').last.click()
+        await pg.wait_for_timeout(700)
+        new = [t for t in await txs(pg) if t['id'] not in {x['id'] for x in before}]
+        check('lưu 45k*3 thành khoản 135.000', len(new) == 1 and new[0]['amount'] == 135000, new)
+
+        # Nhập nhanh: gõ nhân/chia trong ô văn bản + nút Máy tính chèn kết quả
+        await pg.evaluate("window.__qltc.forms.openQuickAdd('')")
+        await pg.wait_for_timeout(500)
+        d = pg.locator('[role=dialog]').last
+        await d.locator('textarea').fill('cafe 25k*2, ăn tối 450k/3; bia 35k x 4')
+        await pg.wait_for_timeout(300)
+        amts = await pg.evaluate("[...document.querySelectorAll('[data-testid=qa-item] strong')].map(e => e.textContent)")
+        check('Nhập nhanh đọc 25k*2, 450k/3, 35k x 4', amts == ['50.000 ₫', '150.000 ₫', '140.000 ₫'], amts)
+        await d.locator('textarea').fill('cafe ')
+        await d.get_by_role('button', name='Máy tính').click()
+        await pg.wait_for_timeout(250)
+        qpad = d.get_by_test_id('qa-calc').get_by_test_id('calc-pad')
+        for k in ['4', '5', '0', 'k', '÷', '3']:
+            await qpad.locator(f'[data-key="{k}"]').click()
+        await qpad.locator('[data-key="done"]').click()
+        await pg.wait_for_timeout(250)
+        check('Chèn 450k÷3 vào cuối ô: "cafe 150000"', await d.locator('textarea').input_value() == 'cafe 150000')
+        # dòng chia nợ: bàn phím máy tính ở ô "Phần của …"
+        await d.locator('textarea').fill('ăn tối 450k')
+        await pg.wait_for_timeout(250)
+        await d.get_by_text('Cộng nợ', exact=True).first.click()
+        await pg.wait_for_timeout(300)
+        await d.get_by_role('checkbox').first.click()
+        await pg.wait_for_timeout(250)
+        row_inp = d.locator('input[aria-label^="Phần của"]').first
+        sh = row_inp.locator('xpath=ancestor::div[contains(@class,"grid")][1]')
+        await sh.get_by_test_id('calc-toggle').click()
+        await pg.wait_for_timeout(250)
+        rpad = sh.get_by_test_id('calc-pad')
+        await rpad.locator('[data-key="clear"]').click()
+        for k in ['4', '5', '0', 'k', '÷', '3', '=']:
+            await rpad.locator(f'[data-key="{k}"]').click()
+        check('ô Phần của người: 450k÷3 → 150000', await row_inp.input_value() == '150000', await row_inp.input_value())
+        await pg.keyboard.press('Escape')
+        await pg.wait_for_timeout(300)
+
+        # Cài đặt: ô tự lưu khi đóng bàn phím
+        await goto(pg, 'settings')
+        await pg.wait_for_timeout(500)
+        lot = pg.locator('div[data-slot=field]', has_text='Cỡ lô chiều “Sang”').first
+        await lot.get_by_test_id('calc-toggle').click()
+        await pg.wait_for_timeout(250)
+        lpad = lot.get_by_test_id('calc-pad')
+        await lpad.locator('[data-key="clear"]').click()
+        for k in ['2', '0', 'tr', '×', '1', '0', '=', 'done']:
+            await lpad.locator(f'[data-key="{k}"]').click()
+        await pg.wait_for_timeout(600)
+        check('cài đặt: đóng bàn phím tự lưu 20tr×10 = 200.000.000', '200000000' in await pg.evaluate("JSON.stringify(window.__qltc.store.settings())"))
+        check('console sạch (máy tính)', not pg.logs, pg.logs[:3])
+        await pg.context.close()
+
         # ── Máy tính 1280×800 ──────────────────────────────────────────────
         pg = await new_page(b, {'width': 1280, 'height': 800}, scheme='dark')
         await seed(pg)

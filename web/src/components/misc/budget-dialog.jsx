@@ -18,7 +18,7 @@ function BudgetForm({ b }) {
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    const v = readAmount(amount);
+    const v = readAmount(amount, currency);
     if (!(v > 0)) return toast('Nhập hạn mức lớn hơn 0.', 'error');
     if (store.all('budgets').some((x) => x.id !== (b && b.id) && (x.categoryId || '') === categoryId)) return toast('Danh mục này đã có ngân sách — bấm vào dòng đó để sửa.', 'error');
     setSaving(true);

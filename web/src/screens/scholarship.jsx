@@ -51,7 +51,7 @@ function ScholarshipForm({ x }) {
   });
   const accOptions = [{ value: '', label: '— Không cộng vào thẻ nào —' }, ...cardOpts];
 
-  const v = readAmount(amount);
+  const v = readAmount(amount, SCHOLARSHIP_CURRENCY);
   let hint = '';
   if (received) {
     if (!accountId) hint = linkedTx ? 'Bỏ chọn thẻ sẽ xóa khoản đã cộng trước đây khỏi số dư thẻ.' : 'Không ghi khoản thu nào — dùng khi số dư thẻ đã tính sẵn học bổng này.';

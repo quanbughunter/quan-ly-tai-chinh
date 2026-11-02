@@ -13,7 +13,7 @@ export function NumField({ label, value, onSave, cur = '', hint }) {
   useEffect(() => { setText(value == null ? '' : String(value)); }, [value]);
 
   const commit = async () => {
-    const v = readAmount(text);
+    const v = readAmount(text); // không làm tròn: ô này còn dùng cho tỷ giá có số lẻ
     if (!Number.isFinite(v) || v < 0) { toast('Số không hợp lệ.', 'error'); return; }
     if (v === Number(value)) return;
     try { await onSave(v); toast('Đã lưu.', 'ok'); } catch (e) { toast(errMsg(e), 'error'); }
@@ -26,6 +26,7 @@ export function NumField({ label, value, onSave, cur = '', hint }) {
         onChange={setText}
         currency={cur}
         onBlur={commit}
+        onCommit={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
       />
     </Field>

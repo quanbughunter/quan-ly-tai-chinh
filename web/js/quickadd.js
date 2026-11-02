@@ -1,11 +1,13 @@
 // Nhập nhanh: "cafe 25k, ăn trưa 45k; +lương 10,9tr; grab 38k usd" → nhiều giao dịch riêng.
 // Giữ ý tưởng của tab `vnd` (nhập nhiều khoản một lần) nhưng mỗi khoản có ghi chú và phân loại.
 
-import { parseAmount, SUFFIX_WORDS } from './money.js';
+import { parseExpr, roundCur, SUFFIX_WORDS } from './money.js';
 import { fold } from './calc.js';
 
 const SUFFIX_RE = [...SUFFIX_WORDS].sort((a, b) => b.length - a.length).join('|');
-const AMOUNT_RE = new RegExp(`(?<![\\p{L}\\d])([+-]?\\d[\\d.,]*)\\s*(${SUFFIX_RE})?(?![\\p{L}\\d])`, 'iu');
+// Một số tiền (có thể kèm k/tr/tỷ). Cho phép nối bằng nhân/chia: "25k*2", "450k/3", "35k x 4", "1tr ÷ 3".
+const NUM = `\\d[\\d.,]*(?:\\s*(?:${SUFFIX_RE})(?![\\p{L}\\d]))?`;
+const AMOUNT_RE = new RegExp(`(?<![\\p{L}\\d])([+-]?${NUM}(?:\\s*[*×÷/x]\\s*${NUM})*)(?![\\p{L}\\d])`, 'iu');
 const CUR_RE = /(?:^|\s)(rub|rúp|rup|usdt|usd|vnd)(?=\s|$)|([₽$₫])/giu;
 
 const CUR_WORD = { rub: 'RUB', 'rúp': 'RUB', rup: 'RUB', usdt: 'USDT', usd: 'USD', vnd: 'VND', '₽': 'RUB', $: 'USD', '₫': 'VND' };
@@ -64,7 +66,8 @@ export function parseQuick(text, { defaultCurrency = 'VND', defaultKind = 'expen
     let numStr = m[1];
     if (numStr.startsWith('+')) { kind = 'income'; numStr = numStr.slice(1); }
     else if (numStr.startsWith('-')) { numStr = numStr.slice(1); if (defaultKind === 'income') kind = 'expense'; }
-    const amount = parseAmount(numStr + (m[2] || ''));
+    const r = parseExpr(numStr);
+    const amount = r ? roundCur(r.total, currency || defaultCurrency) : NaN;
     if (!(amount > 0)) return { raw, error: 'Số tiền không hợp lệ' };
     const note = `${s.slice(0, m.index)} ${s.slice(m.index + m[0].length)}`.replace(/\s+/g, ' ').trim();
     return {

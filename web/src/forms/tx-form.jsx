@@ -89,15 +89,15 @@ function TxForm({ init }) {
   });
 
   const amtLabel = group === 'adjust' ? 'Số tiền điều chỉnh (+ hoặc −)' : cross ? 'Số tiền ghi nợ' : 'Số tiền';
-  const amtNum = readAmount(st.amount);
+  const amtNum = readAmount(st.amount, cur);
 
   let rateText = '';
-  if (cross) rateText = impliedRate(amtNum, cur, readAmount(st.accountAmount), a.currency);
+  if (cross) rateText = impliedRate(amtNum, cur, readAmount(st.accountAmount, a.currency), a.currency);
   let transferRate = '';
   const toCross = group === 'transfer' && to && a && to.currency !== a.currency;
   if (toCross) {
     const x = amtNum;
-    const y = readAmount(st.toAmount);
+    const y = readAmount(st.toAmount, to.currency);
     if (x > 0 && y > 0) transferRate = y / x < 1 ? `Tỷ giá ngầm: 1 ${to.currency} = ${fmtNum(x / y, 2)} ${a.currency}` : `Tỷ giá ngầm: 1 ${a.currency} = ${fmtNum(y / x, 2)} ${to.currency}`;
   }
 
@@ -114,7 +114,7 @@ function TxForm({ init }) {
       accountId: a ? a.id : '', note: st.note.trim(),
     };
     if (debtCur && a && a.currency !== debtCur) {
-      const aa = readAmount(st.accountAmount);
+      const aa = readAmount(st.accountAmount, a.currency);
       if (!(aa > 0)) return toast(`Nhập số tiền ${outflow ? 'trừ khỏi' : 'cộng vào'} tài khoản (${a.currency}).`, 'error');
       doc.accountAmount = aa;
     }
@@ -125,7 +125,7 @@ function TxForm({ init }) {
       if (to.id === a.id) return toast('Tài khoản nhận phải khác tài khoản gửi.', 'error');
       doc.toAccountId = to.id;
       if (to.currency !== a.currency) {
-        const ta = readAmount(st.toAmount);
+        const ta = readAmount(st.toAmount, to.currency);
         if (!(ta > 0)) return toast(`Nhập số tiền nhận được (${to.currency}).`, 'error');
         doc.toAmount = ta;
       }
@@ -210,7 +210,7 @@ function TxForm({ init }) {
           </Field>
         ) : null}
 
-        <Field label={`${amtLabel}${cur && (a || isDebt || noAcc) ? ` (${cur})` : ''}`} hint="Gõ được: 25k, 1,5tr, 3tr+500k">
+        <Field label={`${amtLabel}${cur && (a || isDebt || noAcc) ? ` (${cur})` : ''}`} hint="Gõ được: 25k, 1,5tr, 3tr+500k, 45k*3, 450k/3 — hoặc bấm nút máy tính bên phải ô.">
           <MoneyInput value={st.amount} onChange={(v) => patch({ amount: v })} currency={cur} />
         </Field>
 

@@ -61,3 +61,23 @@ test('chế độ nhập khoản thu: dấu - đầu số chuyển thành chi', 
 test('chế độ mặc định không đổi: không có + vẫn là chi', () => {
   assert.equal(parseQuick('lương 11tr')[0].kind, 'expense');
 });
+
+test('nhân chia ngay trong ô Nhập nhanh: 25k*2, 450k/3, 35k x 4', () => {
+  const r = parseQuick('cafe 25k*2, ăn tối 450k/3; bia 35k x 4; kẹo 1tr ÷ 3');
+  assert.deepEqual(r.map((x) => x.amount), [50_000, 150_000, 140_000, 333_333]);
+  assert.deepEqual(r.map((x) => x.note), ['cafe', 'ăn tối', 'bia', 'kẹo']);
+});
+
+test('nhân chia: ngoại tệ làm tròn 2 số lẻ, khoản thu dùng +', () => {
+  const r = parseQuick('ship 10/3 usd; +lương 5tr*2');
+  assert.equal(r[0].amount, 3.33);
+  assert.equal(r[0].currency, 'USD');
+  assert.equal(r[1].kind, 'income');
+  assert.equal(r[1].amount, 10_000_000);
+});
+
+test('chữ x trong từ không bị tính là phép nhân', () => {
+  const r = parseQuick('xe bus 15k, taxi 2 lần 300k');
+  assert.equal(r[0].amount, 15_000);
+  assert.equal(r[0].note, 'xe bus');
+});

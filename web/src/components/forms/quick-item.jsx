@@ -1,7 +1,8 @@
 // Thẻ một khoản trong Nhập nhanh: ghi chú, danh mục, chia nợ (khoản chi) hoặc gửi bố (khoản thu).
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Plus, X, TriangleAlert, Users } from 'lucide-react';
-import { fmtMoney, parseExpr, CUR_INFO } from '@logic/money.js';
+import { fmtMoney, parseExpr, roundCur, CUR_INFO } from '@logic/money.js';
 import { planOf, homePlanOf, HOME_NAME } from '@logic/quicksave.js';
 import { describeShare, describeSendHome } from '@logic/share.js';
 import { debtBalances } from '@logic/calc.js';
@@ -12,6 +13,7 @@ import { cn } from '@/lib/cn.js';
 import { Badge } from '@/components/ui/badge.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
+import { CalcPad, CalcToggle } from '@/components/ui/calc-pad.jsx';
 import { Select } from '@/components/ui/select.jsx';
 import { Segmented } from '@/components/ui/segmented.jsx';
 import { CheckRow } from '@/components/ui/checkbox.jsx';
@@ -51,9 +53,16 @@ function Panel({ show, children }) {
 
 /** Khoản thu: không chia nợ; chỉ hỏi có gửi cho bố hay không. */
 function SendHome({ item: it, patchHome }) {
+  const [pad, setPad] = useState(false);
   const hm = it.home;
   const plan = homePlanOf(it);
   const bad = hm.on && !plan.ok;
+  const onText = (text) => {
+    const t = text.trim();
+    const r = t ? parseExpr(t) : null;
+    const badIn = !!t && !(r && r.total > 0);
+    patchHome({ text, bad: badIn, manual: t && !badIn ? roundCur(r.total, it.currency) : null });
+  };
   return (
     <>
       <div className="flex items-center justify-between gap-3">
@@ -62,25 +71,23 @@ function SendHome({ item: it, patchHome }) {
       </div>
       <Panel show={hm.on}>
         <div className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-xl bg-muted/60 p-3">
-          <label className="flex items-center gap-3">
-            <span className="flex min-w-0 flex-1 flex-col text-sm"><b>Số tiền gửi {HOME_NAME}</b><span className="text-xs text-muted-foreground">để trống = gửi cả khoản</span></span>
-            <Input
-              className={cn('tnum w-28 text-right sm:w-36', hm.bad && 'border-destructive')}
-              inputMode="decimal"
-              autoComplete="off"
-              placeholder="Để trống = gửi cả khoản"
-              aria-label={`Số tiền gửi ${HOME_NAME}`}
-              value={hm.text}
-              onChange={(e) => {
-                const text = e.target.value;
-                const t = text.trim();
-                const r = t ? parseExpr(t) : null;
-                const badIn = !!t && !(r && r.total > 0);
-                patchHome({ text, bad: badIn, manual: t && !badIn ? r.total : null });
-              }}
-            />
-            <span className="tnum w-6 text-sm text-muted-foreground">{symbolOf(it.currency)}</span>
-          </label>
+          <div className="flex items-center gap-2">
+            <label className="flex min-w-0 flex-1 items-center gap-3">
+              <span className="flex min-w-0 flex-1 flex-col text-sm"><b>Số tiền gửi {HOME_NAME}</b><span className="text-xs text-muted-foreground">để trống = gửi cả khoản</span></span>
+              <Input
+                className={cn('tnum w-28 text-right sm:w-36', hm.bad && 'border-destructive')}
+                inputMode={pad ? 'none' : 'text'}
+                autoComplete="off"
+                placeholder="Để trống = gửi cả khoản"
+                aria-label={`Số tiền gửi ${HOME_NAME}`}
+                value={hm.text}
+                onChange={(e) => onText(e.target.value)}
+              />
+              <span className="tnum w-6 text-sm text-muted-foreground">{symbolOf(it.currency)}</span>
+            </label>
+            <CalcToggle open={pad} onClick={() => setPad((o) => !o)} />
+          </div>
+          {pad ? <CalcPad value={hm.text} onChange={onText} currency={it.currency} onDone={() => setPad(false)} /> : null}
           <p className={cn('text-xs leading-relaxed', bad ? 'font-medium text-destructive' : 'text-muted-foreground')}>{describeSendHome({ plan, currency: it.currency, toName: HOME_NAME })}</p>
         </div>
       </Panel>
@@ -90,6 +97,7 @@ function SendHome({ item: it, patchHome }) {
 
 /** Khoản chi: chia cho người trong Vay nợ. */
 function ShareDebt({ item: it, patchDebt, onApplyAll }) {
+  const [padFor, setPadFor] = useState(null); // id người đang mở bàn phím máy tính
   const d = it.debt;
   const plan = planOf(it);
   const active = d.mode !== 'none';
@@ -112,7 +120,7 @@ function ShareDebt({ item: it, patchDebt, onApplyAll }) {
     const t = value.trim();
     if (t) {
       const r = parseExpr(t);
-      if (r && r.total > 0) manual[id] = r.total; else bad[id] = true;
+      if (r && r.total > 0) manual[id] = roundCur(r.total, it.currency); else bad[id] = true;
     }
     patchDebt({ text, manual, bad });
   };
@@ -168,19 +176,25 @@ function ShareDebt({ item: it, patchDebt, onApplyAll }) {
               const isManual = id in d.manual;
               const shown = id in d.text ? d.text[id] : (plan.ok && plan.shares[id] != null ? String(plan.shares[id]) : '');
               return (
-                <label key={id} className="flex items-center gap-3">
-                  <span className="flex min-w-0 flex-1 flex-col text-sm"><b className="truncate">{nameOf(id)}</b><span className="text-xs text-muted-foreground">{now}</span></span>
-                  <Input
-                    className={cn('tnum w-28 text-right sm:w-36', !isManual && !d.bad[id] && 'text-muted-foreground', d.bad[id] && 'border-destructive')}
-                    inputMode="decimal"
-                    autoComplete="off"
-                    aria-label={`Phần của ${nameOf(id)}`}
-                    value={shown}
-                    onChange={(e) => onAmount(id, e.target.value)}
-                    onBlur={() => onBlur(id)}
-                  />
-                  <span className="tnum w-6 text-sm text-muted-foreground">{symbolOf(it.currency)}</span>
-                </label>
+                <div key={id} className="grid grid-cols-[minmax(0,1fr)] gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="flex min-w-0 flex-1 items-center gap-3">
+                      <span className="flex min-w-0 flex-1 flex-col text-sm"><b className="truncate">{nameOf(id)}</b><span className="text-xs text-muted-foreground">{now}</span></span>
+                      <Input
+                        className={cn('tnum w-28 text-right sm:w-36', !isManual && !d.bad[id] && 'text-muted-foreground', d.bad[id] && 'border-destructive')}
+                        inputMode={padFor === id ? 'none' : 'text'}
+                        autoComplete="off"
+                        aria-label={`Phần của ${nameOf(id)}`}
+                        value={shown}
+                        onChange={(e) => onAmount(id, e.target.value)}
+                        onBlur={() => onBlur(id)}
+                      />
+                      <span className="tnum w-6 text-sm text-muted-foreground">{symbolOf(it.currency)}</span>
+                    </label>
+                    <CalcToggle open={padFor === id} onClick={() => setPadFor(padFor === id ? null : id)} />
+                  </div>
+                  {padFor === id ? <CalcPad value={shown} onChange={(v) => onAmount(id, v)} currency={it.currency} onDone={() => { setPadFor(null); onBlur(id); }} /> : null}
+                </div>
               );
             })}
           </div>

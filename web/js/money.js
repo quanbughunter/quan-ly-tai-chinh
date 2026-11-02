@@ -1,4 +1,4 @@
-// Tiền tệ, định dạng và đọc số tiền gõ tay (25k, 1,5tr, 573000+500000-3000000...)
+// Tiền tệ, định dạng và đọc số tiền gõ tay (25k, 1,5tr, 573000+500000-3000000, 45k*3, (2tr+500k)/4...)
 
 export const CURRENCIES = ['VND', 'RUB', 'USD', 'USDT'];
 
@@ -102,12 +102,130 @@ export function parseAmount(str) {
   return Number.isNaN(n) ? NaN : roundTo(n * mult, 6);
 }
 
-/** Biểu thức cộng/trừ kiểu "=-3830-10210-16025" hoặc "3tr+500k-120000". Trả {total, parts} hoặc null. */
+// ── Máy tính: + − × ÷ và ngoặc; mỗi số có thể kèm k / tr / tỷ (xem SUFFIX) ──
+
+/** Nhân gõ được: * × x (x chỉ tính khi đứng giữa hai số). Chia gõ được: / ÷. */
+const CALC_RE = /[*×÷/()x]/;
+
+/** Tách chuỗi thành số / toán tử / ngoặc. Trả null nếu có ký tự lạ hoặc số không đọc được. */
+function tokenizeCalc(s) {
+  const out = [];
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '+' || c === '-') { out.push({ t: 'op', v: c }); i++; continue; }
+    if (c === '*' || c === '×') { out.push({ t: 'op', v: '*' }); i++; continue; }
+    if (c === '/' || c === '÷') { out.push({ t: 'op', v: '/' }); i++; continue; }
+    if (c === '(' || c === ')') { out.push({ t: c }); i++; continue; }
+    const prev = out[out.length - 1];
+    if (c === 'x' && prev && (prev.t === 'num' || prev.t === ')')) { out.push({ t: 'op', v: '*' }); i++; continue; }
+    const m = /^\d[\d.,]*/.exec(s.slice(i));
+    if (!m) return null;
+    i += m[0].length;
+    let suffix = '';
+    const w = /^[\p{L}₫]+/u.exec(s.slice(i));
+    if (w) {
+      const word = w[0];
+      if (word in SUFFIX) suffix = word;
+      else if (word.length > 1 && word.endsWith('x') && word.slice(0, -1) in SUFFIX) suffix = word.slice(0, -1); // "3trx2"
+      else if (word[0] !== 'x') return null;
+      i += suffix.length;
+    }
+    const v = parseAmount(m[0] + suffix);
+    if (Number.isNaN(v)) return null;
+    out.push({ t: 'num', v });
+  }
+  return out;
+}
+
+/** Tính theo đúng thứ tự: ngoặc → × ÷ → + −. Ném lỗi nếu sai cú pháp hoặc chia cho 0. */
+function evalTokens(tk) {
+  let p = 0;
+  const fail = () => { throw new Error('calc'); };
+  const isOp = (...ops) => tk[p] && tk[p].t === 'op' && ops.includes(tk[p].v);
+  function primary() {
+    const t = tk[p];
+    if (!t) fail();
+    if (t.t === 'num') { p++; return t.v; }
+    if (t.t === '(') {
+      p++;
+      const v = expr();
+      if (!tk[p] || tk[p].t !== ')') fail();
+      p++;
+      return v;
+    }
+    return fail();
+  }
+  function unary() {
+    if (isOp('+', '-')) { const neg = tk[p++].v === '-'; const v = unary(); return neg ? -v : v; }
+    return primary();
+  }
+  function term() {
+    let v = unary();
+    while (isOp('*', '/')) {
+      const op = tk[p++].v;
+      const r = unary();
+      if (op === '/') { if (r === 0) fail(); v /= r; } else v *= r;
+    }
+    return v;
+  }
+  function expr() {
+    let v = term();
+    while (isOp('+', '-')) {
+      const op = tk[p++].v;
+      const r = term();
+      v = op === '+' ? v + r : v - r;
+    }
+    return v;
+  }
+  const v = expr();
+  if (p !== tk.length) fail();
+  return v;
+}
+
+function calc(s) {
+  if (s.length > 200) return null;
+  const tk = tokenizeCalc(s.toLowerCase());
+  if (!tk || !tk.length) return null;
+  try {
+    const v = evalTokens(tk);
+    return Number.isFinite(v) ? roundTo(v, 6) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Biểu thức tiền: "=-3830-10210-16025", "3tr+500k-120000", "45k*3", "450k/3", "(2tr+500k)*2", "3x25k".
+ * Trả {total, parts} hoặc null. Với biểu thức chỉ có + − thì parts là từng số hạng; có × ÷ hoặc ngoặc thì parts = [total].
+ */
 export function parseExpr(str) {
-  let s = String(str ?? '').trim().replace(/^=/, '').replace(/\s+/g, '');
+  const s = String(str ?? '').trim().replace(/^=/, '').replace(/\s+/g, '');
   if (!s) return null;
+  if (CALC_RE.test(s.toLowerCase())) {
+    const total = calc(s);
+    return total == null ? null : { total, parts: [total] };
+  }
   const parts = s.split(/(?=[+-])/).filter(Boolean);
   const vals = parts.map(parseAmount);
   if (vals.some((v) => Number.isNaN(v))) return null;
   return { total: roundTo(vals.reduce((a, b) => a + b, 0), 6), parts: vals };
+}
+
+/** Làm tròn theo số lẻ của tiền tệ (VND 0, còn lại 2); tiền tệ lạ hoặc rỗng (tỷ giá...) thì giữ nguyên. */
+export function roundCur(n, cur) {
+  const info = CUR_INFO[cur];
+  return info ? roundTo(n, info.dec) : n;
+}
+
+/**
+ * Số → chuỗi đưa lại vào ô nhập mà parseAmount đọc ra đúng số cũ.
+ * Lưu ý "1.234" bị đọc thành 1234 (dấu chấm ngăn nghìn), nên số lẻ đúng 3 chữ số được thêm số 0: "1.2340".
+ */
+export function toEditable(n, cur = '') {
+  if (n == null || !Number.isFinite(Number(n))) return '';
+  const v = cur && CUR_INFO[cur] ? roundTo(n, CUR_INFO[cur].dec) : roundTo(n, 6);
+  let s = String(Object.is(v, -0) ? 0 : v);
+  if (/^-?\d{1,3}\.\d{3}$/.test(s)) s += '0';
+  return s;
 }

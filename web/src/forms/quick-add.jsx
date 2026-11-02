@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { Save, Undo2 } from 'lucide-react';
+import { Calculator, Save, Undo2 } from 'lucide-react';
 import { store, useStore } from '@/lib/store-hooks.js';
 import { todayStr } from '@logic/dates.js';
+import { parseExpr, roundCur, toEditable } from '@logic/money.js';
 import { buildQuickDocs, itemOk, HOME_NAME } from '@logic/quicksave.js';
 import { openDialog, useDialog } from '@/lib/dialogs.jsx';
 import { toast } from '@/lib/toast.js';
@@ -14,6 +15,8 @@ import { Button } from '@/components/ui/button.jsx';
 import { Field, FieldRow } from '@/components/ui/field.jsx';
 import { Input, Textarea } from '@/components/ui/input.jsx';
 import { Select } from '@/components/ui/select.jsx';
+import { CalcPad } from '@/components/ui/calc-pad.jsx';
+import { MoneyInput } from '@/components/ui/money-input.jsx';
 import { InfoNote } from '@/components/forms/pickers.jsx';
 import { QuickItem, QuickErrorRow } from '@/components/forms/quick-item.jsx';
 import { buildItems, catByName, homeKey, SHARE_PEOPLE_KEY } from '@/components/forms/quick-helpers.js';
@@ -32,11 +35,24 @@ function QuickAdd({ initialText, income }) {
   const [date, setDate] = useState(todayStr);
   const [text, setText] = useState(initialText);
   const account = accById(accountId) || null;
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [calcText, setCalcText] = useState('');
+  const calcCur = account ? account.currency : 'VND';
   const [items, setItems] = useState(() => buildItems(initialText, { account, income }));
 
   const reparse = (nextText, nextAccount) => setItems((prev) => buildItems(nextText, { account: nextAccount, income, prev }));
   const onText = (v) => { setText(v); reparse(v, account); };
   const onAccount = (v) => { setAccountId(v); reparse(text, accById(v) || null); };
+
+  // Máy tính: tính xong bấm "Chèn" thì số đó được thêm vào cuối ô văn bản (ví dụ "cafe " + 450k/3 → "cafe 150000").
+  const insertCalc = () => {
+    const r = parseExpr(calcText);
+    if (!r || !(r.total > 0)) { toast('Nhập phép tính cho ra số lớn hơn 0.', 'error'); return; }
+    const num = toEditable(roundCur(r.total, calcCur), calcCur);
+    onText(`${text}${!text || /[\s,;]$/.test(text) ? '' : ' '}${num}`);
+    setCalcText('');
+    setCalcOpen(false);
+  };
 
   const patch = (uid, p) => setItems((all) => all.map((x) => (x.uid === uid ? { ...x, ...p } : x)));
   const patchDebt = (uid, p) => setItems((all) => all.map((x) => (x.uid === uid ? { ...x, debt: { ...x.debt, ...p } } : x)));
@@ -95,6 +111,18 @@ function QuickAdd({ initialText, income }) {
         >
           <Textarea rows={3} value={text} onChange={(e) => onText(e.target.value)} placeholder={income ? 'lương 11tr; thưởng 2tr; làm thêm 500k' : 'cafe 25k, ăn trưa 45k; +lương 10,9tr; grab 38k'} />
         </Field>
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
+          <Button variant="soft" size="sm" className="justify-self-start" aria-expanded={calcOpen} onClick={() => setCalcOpen((o) => !o)}>
+            <Calculator />{calcOpen ? 'Ẩn máy tính' : 'Máy tính'}
+          </Button>
+          {calcOpen ? (
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-2 rounded-2xl border bg-muted/40 p-3" data-testid="qa-calc">
+              <p className="text-xs text-muted-foreground">Tính số tiền rồi bấm “Chèn”: kết quả được thêm vào cuối ô ở trên. Gõ thẳng cũng được, ví dụ cafe 25k*2 hoặc ăn tối 450k/3.</p>
+              <MoneyInput calc={false} value={calcText} onChange={setCalcText} currency={calcCur} placeholder="Ví dụ: 450k/3" aria-label="Phép tính" />
+              <CalcPad value={calcText} onChange={setCalcText} currency={calcCur} doneLabel="Chèn" onDone={insertCalc} />
+            </div>
+          ) : null}
+        </div>
         <FieldRow>
           <Field label="Tài khoản"><Select options={accountOptions({ none: NO_ACCOUNT_LABEL })} value={accountId} onChange={onAccount} /></Field>
           <Field label="Ngày"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>

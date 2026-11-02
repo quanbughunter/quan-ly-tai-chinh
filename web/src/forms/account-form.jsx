@@ -26,7 +26,7 @@ function AccountForm({ account: a, onSaved }) {
 
   async function onSave() {
     if (!st.name.trim()) return toast('Nhập tên tài khoản.', 'error');
-    const op = readAmount(st.opening);
+    const op = readAmount(st.opening, st.currency);
     try {
       const d = await store.put('accounts', {
         ...(a || {}), name: st.name.trim(), kind: st.kind, currency: st.currency,

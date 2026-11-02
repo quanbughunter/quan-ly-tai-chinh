@@ -18,7 +18,7 @@ function ReconcileForm({ account: a }) {
   const { close } = useDialog();
   const [bal] = useState(() => accountBalances(store.all('accounts'), store.all('txs')).get(a.id) || 0);
   const [text, setText] = useState(() => String(bal));
-  const v = readAmount(text);
+  const v = readAmount(text, a.currency);
   const diff = Number.isNaN(v) ? null : v - bal;
 
   async function onSave() {
