@@ -95,8 +95,11 @@ function SendHome({ item: it, patchHome }) {
   );
 }
 
-/** Khoản chi: chia cho người trong Vay nợ. */
-function ShareDebt({ item: it, patchDebt, onApplyAll }) {
+/**
+ * Khoản chi: chia cho người trong Vay nợ. Dùng chung cho Nhập nhanh và form Thêm giao dịch.
+ * item cần: { amount, currency, debt }; onApplyAll không truyền thì ẩn nút "Dùng cho tất cả khoản".
+ */
+export function ShareDebt({ item: it, patchDebt, onApplyAll }) {
   const [padFor, setPadFor] = useState(null); // id người đang mở bàn phím máy tính
   const d = it.debt;
   const plan = planOf(it);
@@ -203,7 +206,7 @@ function ShareDebt({ item: it, patchDebt, onApplyAll }) {
           </p>
           <div className="flex flex-wrap gap-2">
             {manualCount ? <Button size="sm" variant="ghost" onClick={() => patchDebt({ manual: {}, bad: {}, text: {} })}>Chia đều lại</Button> : null}
-            <Button size="sm" variant="ghost" onClick={onApplyAll}>Dùng cho tất cả khoản</Button>
+            {onApplyAll ? <Button size="sm" variant="ghost" onClick={onApplyAll}>Dùng cho tất cả khoản</Button> : null}
           </div>
         </div>
       </Panel>

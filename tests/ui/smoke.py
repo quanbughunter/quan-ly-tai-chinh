@@ -331,6 +331,90 @@ async def main():
         check('console sạch (máy tính)', not pg.logs, pg.logs[:3])
         await pg.context.close()
 
+        # ── Chia nợ (Cộng nợ / Trừ nợ) trong form Thêm giao dịch: nút Thêm ở tab Giao dịch + nút "+" ──
+        pg = await new_page(b, {'width': 390, 'height': 844})
+        await seed(pg)
+        await goto(pg, 'tx')
+        await pg.get_by_role('button', name='Thêm', exact=True).first.click()
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        check('tab Giao dịch → Thêm: có khối chia nợ', await d.get_by_test_id('tx-share').count() == 1)
+        check('mặc định là Không chia, chưa hiện danh sách người', await d.get_by_role('checkbox').count() == 0)
+        before = await txs(pg)
+        await d.locator('input[placeholder="0"]').first.fill('450k')
+        await d.get_by_test_id('tx-share').get_by_text('Cộng nợ', exact=True).click()
+        await pg.wait_for_timeout(300)
+        await d.get_by_role('button', name='Lưu').last.click()
+        await pg.wait_for_timeout(400)
+        check('Cộng nợ chưa chọn ai: không lưu, hộp thoại còn mở', await dialog_count(pg) == 1 and len(await txs(pg)) == len(before))
+        chips = d.get_by_test_id('tx-share').get_by_role('checkbox')
+        names = []
+        for i in range(2):
+            names.append((await chips.nth(i).inner_text()).strip())
+            await chips.nth(i).click()
+            await pg.wait_for_timeout(150)
+        await pg.wait_for_timeout(250)
+        await pg.screenshot(path='/tmp/shots/tx-share-add.png')
+        txt = await d.inner_text()
+        check('tóm tắt chia 3 phần (2 người + mình) = 150.000 ₫', txt.count('150.000 ₫') >= 2 and 'Tài khoản −450.000 ₫' in txt, txt[-400:])
+        await d.get_by_role('button', name='Lưu').last.click()
+        await pg.wait_for_timeout(700)
+        ids = {x['id'] for x in before}
+        new = [t for t in await txs(pg) if t['id'] not in ids]
+        kinds = sorted(t['kind'] for t in new)
+        check('Cộng nợ ghi 2 khoản cho vay + 1 khoản chi phần mình', kinds == ['expense', 'lend', 'lend'], kinds)
+        check('tổng các phần = 450.000 và cùng một tài khoản', sum(t['amount'] for t in new) == 450000 and len({t['accountId'] for t in new}) == 1, new)
+        check('đóng hộp thoại sau khi lưu', await dialog_count(pg) == 0)
+
+        # Nút "+" nổi → Khoản chi → Trừ nợ
+        await goto(pg, '')
+        await pg.get_by_label('Thêm giao dịch').first.click()
+        await pg.wait_for_timeout(400)
+        await pg.get_by_text('Khoản chi', exact=True).click()
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        check('nút "+" → Khoản chi: có khối chia nợ', await d.get_by_test_id('tx-share').count() == 1)
+        check('chưa chia: có ô Danh mục', await d.get_by_text('Danh mục', exact=True).count() == 1)
+        before = await txs(pg)
+        await d.locator('input[placeholder="0"]').first.fill('300k')
+        await d.get_by_test_id('tx-share').get_by_text('Trừ nợ', exact=True).click()
+        await pg.wait_for_timeout(300)
+        check('Trừ nợ: ẩn ô Danh mục', await d.get_by_text('Danh mục', exact=True).count() == 0)
+        await d.get_by_test_id('tx-share').get_by_role('checkbox').first.click()
+        await pg.wait_for_timeout(250)
+        await d.get_by_role('button', name='Lưu').last.click()
+        await pg.wait_for_timeout(700)
+        ids = {x['id'] for x in before}
+        new = [t for t in await txs(pg) if t['id'] not in ids]
+        check('Trừ nợ ghi 1 khoản "Thu nợ" đủ 300.000', len(new) == 1 and new[0]['kind'] == 'repay_in' and new[0]['amount'] == 300000, new)
+
+        # Khoản chi thường (không chia) vẫn lưu đúng 1 giao dịch; Thu / sửa giao dịch cũ không có khối chia nợ
+        await goto(pg, 'tx')
+        await pg.get_by_role('button', name='Thêm', exact=True).first.click()
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        before = await txs(pg)
+        await d.locator('input[placeholder="0"]').first.fill('25k')
+        await d.get_by_role('button', name='Lưu').last.click()
+        await pg.wait_for_timeout(600)
+        ids = {x['id'] for x in before}
+        new = [t for t in await txs(pg) if t['id'] not in ids]
+        check('Không chia: vẫn lưu đúng 1 giao dịch', len(new) == 1 and new[0]['kind'] == 'expense' and new[0]['amount'] == 25000, new)
+        await pg.get_by_role('button', name='Thêm', exact=True).first.click()
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        await d.get_by_text('Thu', exact=True).first.click()
+        await pg.wait_for_timeout(300)
+        check('nhóm Thu: không có khối chia nợ', await d.get_by_test_id('tx-share').count() == 0)
+        await pg.keyboard.press('Escape')
+        await pg.wait_for_timeout(300)
+        await pg.evaluate("window.__qltc.forms.openTxForm({ tx: window.__qltc.store.all('txs').find(t => t.kind === 'expense' && !t.dealId && !t.scholarshipId) })")
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        check('sửa giao dịch cũ: không có khối chia nợ', 'Sửa giao dịch' in await d.inner_text() and await d.get_by_test_id('tx-share').count() == 0)
+        check('console sạch (chia nợ trong form giao dịch)', not pg.logs, pg.logs[:3])
+        await pg.context.close()
+
         # ── Máy tính 1280×800 ──────────────────────────────────────────────
         pg = await new_page(b, {'width': 1280, 'height': 800}, scheme='dark')
         await seed(pg)

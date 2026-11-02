@@ -5,11 +5,12 @@ import { store, useStore } from '@/lib/store-hooks.js';
 import { TX_KINDS } from '@logic/model.js';
 import { todayStr } from '@logic/dates.js';
 import { fmtNum, impliedRate } from '@logic/money.js';
+import { newDebt, planOf, buildQuickDocs } from '@logic/quicksave.js';
 import { openDialog, useDialog, confirmBox } from '@/lib/dialogs.jsx';
 import { toast } from '@/lib/toast.js';
 import { errMsg } from '@/lib/format.js';
 import { lsGet, lsSet } from '@/lib/storage.js';
-import { accountOptions, categoryOptions, partyOptions, currencyOptions, accById } from '@/lib/options.js';
+import { accountOptions, categoryOptions, partyOptions, currencyOptions, accById, partyById } from '@/lib/options.js';
 import { Modal } from '@/components/ui/modal.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Field, FieldRow } from '@/components/ui/field.jsx';
@@ -18,6 +19,8 @@ import { Select } from '@/components/ui/select.jsx';
 import { Segmented } from '@/components/ui/segmented.jsx';
 import { MoneyInput, readAmount } from '@/components/ui/money-input.jsx';
 import { SelectWithAdd, InfoNote } from '@/components/forms/pickers.jsx';
+import { ShareDebt } from '@/components/forms/quick-item.jsx';
+import { SHARE_ME_KEY, SHARE_PEOPLE_KEY } from '@/components/forms/quick-helpers.js';
 import { DEBT_KINDS, NO_ACCOUNT_LABEL, NO_ACCOUNT_NOTE } from './constants.js';
 import { openAccountForm } from './account-form.jsx';
 import { openPartyForm } from './party-form.jsx';
@@ -32,6 +35,9 @@ const GROUPS = [
 ];
 const groupOf = (kind) => (DEBT_KINDS.includes(kind) ? 'debt' : kind || 'expense');
 const str = (v) => (v == null ? '' : String(v));
+const nameOf = (id) => (partyById(id) || {}).name || '?';
+/** Đổi tiền tệ thì các phần nhập tay của người chia nợ không còn đúng đơn vị → bỏ, chia đều lại. */
+const resetShares = (debt) => ({ ...debt, manual: {}, bad: {}, text: {} });
 
 function defaultAccountId(init, t) {
   const last = lsGet('qltc:lastAccount');
@@ -54,6 +60,8 @@ function initialState(init, t, defAcc) {
     partyId: t ? t.partyId || '' : init.partyId || '',
     categoryId: t ? t.categoryId || '' : '',
     note: t ? t.note || '' : '',
+    // Chia khoản chi cho người trong Vay nợ (chỉ khi thêm mới khoản chi).
+    debt: { ...newDebt({ includeMe: lsGet(SHARE_ME_KEY) !== '0' }), text: {} },
   };
 }
 
@@ -75,6 +83,10 @@ function TxForm({ init }) {
   const cur = isDebt ? st.currency : a ? a.currency : st.currency;
   const cross = isDebt && !!a && a.currency !== cur; // khoản nợ khác tiền tệ với tài khoản
   const outflow = st.debtKind === 'lend' || st.debtKind === 'repay_out';
+  const canShare = !t && group === 'expense';
+  const shareOn = canShare && st.debt.mode !== 'none';
+  // Trừ nợ, hoặc cộng nợ mà không tính phần của mình: không còn khoản chi nào để phân loại.
+  const hideCat = shareOn && (st.debt.mode === 'sub' || !st.debt.includeMe);
 
   const setGroup = (v) => setSt((s) => {
     const n = { ...s, group: v };
@@ -85,8 +97,10 @@ function TxForm({ init }) {
   });
   const setAccount = (v) => setSt((s) => {
     const acc = accById(v);
-    return { ...s, accountId: v, currency: acc ? acc.currency : s.currency };
+    const next = acc ? acc.currency : s.currency;
+    return { ...s, accountId: v, currency: next, debt: next === s.currency ? s.debt : resetShares(s.debt) };
   });
+  const patchDebt = (p) => setSt((s) => ({ ...s, debt: { ...s.debt, ...p } }));
 
   const amtLabel = group === 'adjust' ? 'Số tiền điều chỉnh (+ hoặc −)' : cross ? 'Số tiền ghi nợ' : 'Số tiền';
   const amtNum = readAmount(st.amount, cur);
@@ -108,6 +122,7 @@ function TxForm({ init }) {
     if (!st.date) return toast('Chọn ngày.', 'error');
     if (!isDebt && !canNone && !a) return toast('Chọn tài khoản.', 'error');
     if (isDebt && !st.partyId) return toast('Chọn người liên quan đến khoản vay nợ.', 'error');
+    if (shareOn) return onSaveShared(amount);
     const doc = {
       id: t ? t.id : undefined, ts: t ? t.ts : undefined,
       date: st.date, kind, amount, currency: debtCur || (a ? a.currency : st.currency),
@@ -135,6 +150,21 @@ function TxForm({ init }) {
       if (a) lsSet('qltc:lastAccount', a.id);
       close();
       toast(t ? 'Đã cập nhật giao dịch.' : 'Đã lưu giao dịch.', 'ok');
+    } catch (e) { toast(errMsg(e), 'error'); }
+  }
+
+  // Chi + Cộng nợ / Trừ nợ: ghi nhiều giao dịch cùng lúc (giống Nhập nhanh).
+  async function onSaveShared(amount) {
+    const item = { kind: 'expense', amount, currency: cur, note: st.note.trim(), categoryId: st.categoryId || '', debt: st.debt };
+    const plan = planOf(item);
+    if (!plan.ok) return toast(plan.error || 'Cách chia chưa hợp lệ.', 'error');
+    const { docs } = buildQuickDocs({ items: [item], account: a || null, date: st.date, nameOf });
+    try {
+      await store.putMany('txs', docs);
+      if (a) lsSet('qltc:lastAccount', a.id);
+      lsSet(SHARE_PEOPLE_KEY, JSON.stringify(st.debt.partyIds));
+      close();
+      toast(`Đã lưu ${docs.length} giao dịch (gắn với Vay nợ).`, 'ok');
     } catch (e) { toast(errMsg(e), 'error'); }
   }
 
@@ -206,7 +236,7 @@ function TxForm({ init }) {
             label={isDebt ? 'Tiền tệ khoản nợ' : 'Tiền tệ'}
             hint={isDebt && a && a.currency !== cur ? `Khác tiền tệ của tài khoản (${a.currency}) — nhập thêm số tiền thực ra / vào tài khoản bên dưới.` : null}
           >
-            <Select options={currencyOptions} value={st.currency} onChange={(v) => patch({ currency: v })} />
+            <Select options={currencyOptions} value={st.currency} onChange={(v) => setSt((s) => ({ ...s, currency: v, debt: v === s.currency ? s.debt : resetShares(s.debt) }))} />
           </Field>
         ) : null}
 
@@ -232,7 +262,7 @@ function TxForm({ init }) {
           </div>
         ) : null}
 
-        {group === 'expense' || group === 'income' ? (
+        {(group === 'expense' || group === 'income') && !hideCat ? (
           <Field label="Danh mục">
             <Select options={categoryOptions(group)} value={st.categoryId} onChange={(v) => patch({ categoryId: v })} />
           </Field>
@@ -241,6 +271,12 @@ function TxForm({ init }) {
         <Field label="Ghi chú">
           <Input value={st.note} placeholder="Ví dụ: ăn trưa, tiền nhà…" onChange={(e) => patch({ note: e.target.value })} />
         </Field>
+
+        {canShare ? (
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-2.5 rounded-2xl border bg-card p-3" data-testid="tx-share">
+            <ShareDebt item={{ amount: amtNum, currency: cur, debt: st.debt }} patchDebt={patchDebt} />
+          </div>
+        ) : null}
       </div>
     </Modal>
   );
