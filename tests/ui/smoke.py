@@ -65,6 +65,23 @@ async def goto(pg, route):
     await pg.wait_for_timeout(500)
 
 
+async def open_view(b, frag, vp=None, scheme='light'):
+    """Mở trang xem bảng công nợ (share.html) với phần #… của link, trên máy chủ thử."""
+    ctx = await b.new_context(viewport=vp or {'width': 390, 'height': 844}, color_scheme=scheme, device_scale_factor=1)
+    pg = await ctx.new_page()
+    pg.logs = []
+    pg.on('console', lambda m: pg.logs.append(m.text[:300]) if m.type in ('error', 'warning') else None)
+    pg.on('pageerror', lambda e: pg.logs.append('ERR ' + str(e)))
+    await pg.goto(URL.rstrip('/') + '/share.html' + frag)
+    await pg.wait_for_timeout(600)
+    return pg
+
+
+def parse_money(txt):
+    import re
+    return float(re.sub(r'[^\d,]', '', txt).replace(',', '.'))
+
+
 async def dialog_count(pg):
     return await pg.locator('[role=dialog]').count()
 
@@ -413,6 +430,93 @@ async def main():
         d = pg.locator('[role=dialog]').last
         check('sửa giao dịch cũ: không có khối chia nợ', 'Sửa giao dịch' in await d.inner_text() and await d.get_by_test_id('tx-share').count() == 0)
         check('console sạch (chia nợ trong form giao dịch)', not pg.logs, pg.logs[:3])
+        await pg.context.close()
+
+        # ── Gửi bảng nợ: tạo link ở trang người vay nợ → mở trang xem ──────────
+        pg = await new_page(b, {'width': 390, 'height': 844})
+        await seed(pg)
+        await pg.evaluate("window.__qltc.store.put('parties', { name: 'Người chưa nợ', role: 'person' })")
+        info = await pg.evaluate("""() => {
+          const s = window.__qltc.store; const K = ['lend', 'repay_in', 'borrow', 'repay_out'];
+          const SIGN = { lend: 1, repay_in: -1, borrow: -1, repay_out: 1 };
+          const debtTxs = (id) => s.all('txs').filter(t => t.partyId === id && K.includes(t.kind));
+          const p = s.all('parties').find(x => debtTxs(x.id).length > 0);
+          const none = s.all('parties').find(x => debtTxs(x.id).length === 0);
+          const bal = {}; for (const t of debtTxs(p.id)) bal[t.currency] = (bal[t.currency] || 0) + SIGN[t.kind] * t.amount;
+          const dates = debtTxs(p.id).map(t => t.date).sort();
+          return { id: p.id, name: p.name, n: debtTxs(p.id).length, bal, last: dates[dates.length - 1], noneId: none ? none.id : null };
+        }""")
+        await goto(pg, 'debts/' + info['id'])
+        await pg.get_by_role('button', name='Gửi bảng nợ').click()
+        await pg.wait_for_timeout(700)
+        d = pg.locator('[role=dialog]').last
+        check('hộp Gửi bảng nợ mở, có tên người nhận', f"Gửi bảng nợ cho {info['name']}" in await d.inner_text())
+        pv = await d.get_by_test_id('share-preview').inner_text()
+        check('xem trước nêu số dòng', f"{info['n']} dòng" in pv, pv)
+        link_in = d.get_by_test_id('share-link')
+        await pg.wait_for_function("document.querySelector('[data-testid=share-link]').value.includes('share.html#v1.')")
+        link0 = await link_in.input_value()
+        check('link trỏ tới share.html#v1.… (đã nén, ngắn)', '/share.html#v1.' in link0 and len(link0) < 3000, len(link0))
+        await d.locator('input[placeholder="Ví dụ: Quân"]').fill('Quân')
+        await d.locator('textarea').fill('STK 0123456789 - NGUYEN VAN A')
+        await pg.wait_for_timeout(500)
+        link = await link_in.input_value()
+        check('đổi tên / ghi chú thì link đổi theo', link != link0)
+        await d.get_by_test_id('share-copy').click()
+        await pg.wait_for_timeout(500)
+        check('bấm Sao chép có báo', 'sao chép' in (await pg.locator('[data-sonner-toaster]').inner_text()).lower())
+        await pg.screenshot(path='/tmp/shots/share-dialog.png')
+
+        # trang người nhận mở bằng đúng link đó
+        v = await open_view(b, link[link.index('#'):])
+        check('trang xem: tiêu đề nêu tên người gửi', await v.locator('h1').inner_text() == 'Công nợ giữa bạn và Quân')
+        rows = await v.locator('tbody tr:not(.open)').count()
+        check('trang xem: đủ số dòng giao dịch', rows == info['n'], (rows, info['n']))
+        bigs = [parse_money(t) for t in await v.locator('.sum .big').all_inner_texts()]
+        want = sorted(round(abs(x), 2) for x in info['bal'].values() if abs(x) > 1e-9)
+        check('trang xem: số còn nợ khớp màn hình Vay nợ', sorted(round(x, 2) for x in bigs) == want, (bigs, want))
+        check('trang xem: có khung ghi chú kèm', 'STK 0123456789' in await v.locator('.note').inner_text())
+        check('trang xem: không tràn ngang trên điện thoại', await v.evaluate('document.documentElement.scrollWidth') <= 390)
+        await v.screenshot(path='/tmp/shots/share-view.png', full_page=True)
+        check('trang xem: console sạch', not v.logs, v.logs[:3])
+        await v.context.close()
+
+        # liệt kê từ ngày: phần trước gộp thành số dư đầu kỳ, tổng vẫn như cũ
+        await d.locator('input[type=date]').fill(info['last'])
+        await pg.wait_for_timeout(500)
+        link2 = await link_in.input_value()
+        v = await open_view(b, link2[link2.index('#'):])
+        txt = await v.locator('#app').inner_text()
+        check('lọc từ ngày: có số dư đầu kỳ và mốc ngày', 'Số dư đầu kỳ' in txt and 'Liệt kê từ ngày' in txt)
+        bigs2 = sorted(round(parse_money(t), 2) for t in await v.locator('.sum .big').all_inner_texts())
+        check('lọc từ ngày: tổng còn nợ không đổi', bigs2 == want, (bigs2, want))
+        await v.context.close()
+
+        # nội dung xấu trong link chỉ hiện thành chữ, không chạy
+        await d.locator('input[placeholder="Ví dụ: Quân"]').fill('<img src=x onerror=alert(1)>')
+        await d.locator('textarea').fill('<b>đậm</b> <script>alert(2)</script>')
+        await pg.wait_for_timeout(500)
+        link3 = await link_in.input_value()
+        v = await open_view(b, link3[link3.index('#'):])
+        check('chữ lạ trong link hiện nguyên văn', '<img src=x onerror=alert(1)>' in await v.locator('h1').inner_text() and '<b>đậm</b>' in await v.locator('.note p').inner_text())
+        check('chữ lạ không tạo thẻ mới', await v.evaluate("document.querySelectorAll('img, .note p b, .note p script').length") == 0)
+        await v.context.close()
+
+        # link hỏng / trống
+        v = await open_view(b, '#v1.AAAA')
+        check('link hỏng: báo không đọc được', 'Không đọc được link' in await v.locator('#app').inner_text())
+        await v.context.close()
+        v = await open_view(b, '')
+        check('không có dữ liệu: báo chưa có dữ liệu', 'Chưa có dữ liệu' in await v.locator('#app').inner_text())
+        await v.context.close()
+
+        # người chưa có giao dịch nợ: nút bị khóa
+        await pg.keyboard.press('Escape')
+        await pg.wait_for_timeout(400)
+        if info['noneId']:
+            await goto(pg, 'debts/' + info['noneId'])
+            check('người chưa có giao dịch nợ: nút Gửi bảng nợ bị khóa', await pg.get_by_role('button', name='Gửi bảng nợ').is_disabled())
+        check('console sạch (Gửi bảng nợ)', not pg.logs, pg.logs[:3])
         await pg.context.close()
 
         # ── Máy tính 1280×800 ──────────────────────────────────────────────

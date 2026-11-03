@@ -4,5 +4,6 @@ export { openQuickAdd } from './quick-add.jsx';
 export { openAccountForm } from './account-form.jsx';
 export { openReconcile } from './reconcile-form.jsx';
 export { openPartyForm } from './party-form.jsx';
+export { openShareStatement } from './share-statement.jsx';
 export { openDealTxNotice, openScholarshipTxNotice } from './notices.jsx';
 export { DEBT_KINDS, DEBT_SIGN } from './constants.js';

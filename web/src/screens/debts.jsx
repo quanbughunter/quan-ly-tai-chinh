@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, ChevronLeft, HandCoins, Pencil, Plus, UserPlus } from 'lucide-react';
+import { ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, ChevronLeft, HandCoins, Pencil, Plus, Share2, UserPlus } from 'lucide-react';
 import { store, useStore } from '@/lib/store-hooks.js';
 import { money } from '@/lib/format.js';
 import { debtBalances, lastDebtDates, DEBT_SIGN } from '@logic/calc.js';
 import { fmtDate, daysBetween, todayStr } from '@logic/dates.js';
 import { roundTo } from '@logic/money.js';
-import { openTxForm, openPartyForm } from '@/forms/index.js';
+import { openTxForm, openPartyForm, openShareStatement } from '@/forms/index.js';
 import { PageHeader } from '@/components/page-header.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, Section } from '@/components/ui/card.jsx';
@@ -144,7 +144,12 @@ function PartyDetail({ id }) {
       <PageHeader
         title={p.name}
         back={back}
-        actions={<Button variant="outline" onClick={() => openPartyForm(p, { onDeleted: () => { location.hash = '#/debts'; } })}><Pencil className="size-4" />Sửa</Button>}
+        actions={(
+          <>
+            <Button variant="outline" disabled={!withRun.length} onClick={() => openShareStatement(id)}><Share2 className="size-4" />Gửi bảng nợ</Button>
+            <Button variant="outline" onClick={() => openPartyForm(p, { onDeleted: () => { location.hash = '#/debts'; } })}><Pencil className="size-4" />Sửa</Button>
+          </>
+        )}
       />
 
       <Reveal enabled={first} index={0}>
