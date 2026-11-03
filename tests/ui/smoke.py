@@ -7,11 +7,19 @@ Cách chạy (từ thư mục dự án):
 Bản dựng --mode test lộ window.__qltc = { store, seedDemo, forms, openDialog } để kịch bản gọi trực tiếp.
 Chặn config.js để app vào chế độ thử (dữ liệu trong trình duyệt), nên không đụng tới Supabase thật.
 """
-import asyncio, json, sys
+import asyncio, datetime, json, sys
 from playwright.async_api import async_playwright
 
 URL = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8140/'
 FAILS = []
+
+
+def month_shift(n):
+    """Ngày đầu của tháng cách tháng hiện tại n tháng (n âm = quá khứ), để kịch bản đúng ở mọi thời điểm chạy."""
+    d = datetime.date.today().replace(day=1)
+    for _ in range(abs(n)):
+        d = (d + datetime.timedelta(days=32)).replace(day=1) if n > 0 else (d - datetime.timedelta(days=1)).replace(day=1)
+    return d
 
 
 def check(name, cond, extra=''):
@@ -517,6 +525,139 @@ async def main():
             await goto(pg, 'debts/' + info['noneId'])
             check('người chưa có giao dịch nợ: nút Gửi bảng nợ bị khóa', await pg.get_by_role('button', name='Gửi bảng nợ').is_disabled())
         check('console sạch (Gửi bảng nợ)', not pg.logs, pg.logs[:3])
+        await pg.context.close()
+
+        # ── Học bổng: khoản thu danh mục «Học bổng» tự đồng bộ sang mục Học bổng MIIGAiK ──
+        pg = await new_page(b, {'width': 390, 'height': 844})
+        await seed(pg)
+        SCH = """() => { const s = window.__qltc.store;
+          const cat = s.all('categories').find(c => c.type === 'income' && c.name === 'Học bổng');
+          const acc = s.all('accounts').find(x => x.currency === 'RUB' && x.kind !== 'savings');
+          let bal = Number(acc.opening || 0);
+          for (const t of s.all('txs')) if (t.accountId === acc.id) bal += t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0;
+          return { rows: s.all('scholarships').map(x => ({ id: x.id, month: x.month, av: x.availableDate, rc: x.receivedDate, txId: x.txId })),
+                   scTxs: s.all('txs').filter(t => t.categoryId === cat.id).length, bal, catId: cat.id, accId: acc.id }; }"""
+        s0 = await pg.evaluate(SCH)
+        wait_month = next(r for r in s0['rows'] if not r['rc'])  # tháng đang chờ (có ngày có, chưa nhận)
+
+        # (1) Tab Giao dịch → Thêm → Thu → Học bổng
+        await goto(pg, 'tx')
+        await pg.get_by_role('button', name='Thêm', exact=True).first.click()
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        await d.get_by_text('Thu', exact=True).first.click()
+        await pg.wait_for_timeout(300)
+        await d.locator('input[placeholder="0"]').first.fill('15000')
+        await d.locator('div[data-slot=field]', has_text='Danh mục').first.locator('button, [role=combobox]').first.click()
+        await pg.wait_for_timeout(300)
+        await pg.get_by_role('option', name='Học bổng').first.click()
+        await pg.wait_for_timeout(500)
+        check('Thu + danh mục Học bổng: hiện ô ghi vào mục Học bổng MIIGAiK', await d.get_by_test_id('sch-sync').count() == 1)
+        check('nhãn ngày đổi thành Ngày thực nhận', await d.get_by_text('Ngày thực nhận', exact=True).count() >= 1)
+        info = await d.get_by_test_id('sch-info').inner_text()
+        check('tháng đang chờ được nhận ra (giữ ngày có cũ)', 'đang chờ' in info and 'giữ ngày có' in info, info)
+        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+        await d.get_by_test_id('sch-available').fill(yesterday)
+        await pg.wait_for_timeout(200)
+        await d.get_by_role('button', name='Lưu').last.click()
+        await pg.wait_for_timeout(700)
+        s1 = await pg.evaluate(SCH)
+        row = next(r for r in s1['rows'] if r['id'] == wait_month['id'])
+        check('lưu: tháng đang chờ thành đã nhận (không tạo tháng thứ hai)', len(s1['rows']) == len(s0['rows']) and bool(row['rc']) and bool(row['txId']), row)
+        check('lưu: ngày có đã nhập được ghi vào tháng', row['av'] == yesterday, row)
+        check('lưu: đúng một khoản thu mới, số dư thẻ tăng 15.000 ₽', s1['scTxs'] == s0['scTxs'] + 1 and s1['bal'] == s0['bal'] + 15000, (s0['bal'], s1['bal']))
+
+        # (2) Nút + → Khoản thu → học bổng: tháng đã nhận thì cập nhật, không cộng lần hai
+        await pg.get_by_label('Thêm giao dịch').first.click()
+        await pg.wait_for_timeout(500)
+        await pg.get_by_text('Khoản thu', exact=True).first.click()
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        await d.locator('textarea').fill('học bổng 15000')
+        await pg.wait_for_timeout(600)
+        check('Khoản thu «học bổng 15000»: nhận ra danh mục, hiện ô đồng bộ, tiền tệ ₽', await d.get_by_test_id('sch-sync').count() == 1 and '₽' in await d.get_by_test_id('qa-item').locator('strong').first.inner_text())
+        check('tháng đã nhận: báo sẽ cập nhật, không cộng thêm', 'không cộng thêm' in await d.get_by_test_id('sch-info').inner_text())
+        await d.get_by_role('button', name='Lưu tất cả').click()
+        await pg.wait_for_timeout(700)
+        s2 = await pg.evaluate(SCH)
+        check('lưu lại cùng tháng: không thêm tháng, không thêm khoản, số dư giữ nguyên', len(s2['rows']) == len(s1['rows']) and s2['scTxs'] == s1['scTxs'] and s2['bal'] == s1['bal'], (s1['bal'], s2['bal']))
+
+        # (3) Nhập nhanh → tháng mới với ngày có + ngày nhận riêng
+        MA = month_shift(2).strftime('%Y-%m')
+        await pg.evaluate("window.__qltc.forms.openQuickAdd('+học bổng 15000 rub')")
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        await d.get_by_test_id('sch-month').fill(MA)
+        await d.get_by_test_id('sch-received').fill(MA + '-03')
+        await d.get_by_test_id('sch-available').fill(MA + '-01')
+        await pg.wait_for_timeout(300)
+        check('tháng mới: báo sẽ tạo', 'Sẽ tạo' in await d.get_by_test_id('sch-info').inner_text())
+        await d.get_by_test_id('sch-available').fill(MA + '-09')
+        await pg.wait_for_timeout(300)
+        check('ngày có sau ngày nhận: báo lỗi và khóa nút Lưu', 'không thể sau' in await d.get_by_test_id('sch-info').inner_text() and await d.get_by_role('button', name='Lưu tất cả').is_disabled())
+        await d.get_by_test_id('sch-available').fill(MA + '-01')
+        await pg.wait_for_timeout(300)
+        await d.get_by_role('button', name='Lưu tất cả').click()
+        await pg.wait_for_timeout(700)
+        s3 = await pg.evaluate(SCH)
+        dec = next((r for r in s3['rows'] if r['month'] == MA), None)
+        check('Nhập nhanh: tạo tháng mới với ngày có 01 và ngày nhận 03', bool(dec) and dec['av'] == MA + '-01' and dec['rc'] == MA + '-03' and bool(dec['txId']), dec)
+        check('Nhập nhanh: số dư thẻ tăng đúng 15.000 ₽ (một khoản thu)', s3['bal'] == s2['bal'] + 15000 and s3['scTxs'] == s2['scTxs'] + 1, (s2['bal'], s3['bal']))
+
+        # (4) Khoản Học bổng nhập từ trước (chưa gắn tháng): màn Học bổng đề nghị gắn, không đổi số dư
+        await pg.evaluate("""async () => { const s = window.__qltc.store;
+          const cat = s.all('categories').find(c => c.type === 'income' && c.name === 'Học bổng');
+          const acc = s.all('accounts').find(x => x.currency === 'RUB' && x.kind !== 'savings');
+          await s.put('txs', { date: '%s-05', kind: 'income', amount: 15000, currency: 'RUB', accountId: acc.id, categoryId: cat.id, note: 'học bổng tháng cũ' }); }""" % month_shift(-8).strftime('%Y-%m'))
+        s4 = await pg.evaluate(SCH)
+        await goto(pg, 'scholarship')
+        await pg.wait_for_timeout(500)
+        check('có khoản Học bổng chưa gắn tháng: màn Học bổng hiện lời nhắc', await pg.get_by_test_id('sch-orphans').count() == 1)
+        await pg.get_by_test_id('sch-orphans').get_by_role('button').first.click()
+        await pg.wait_for_timeout(800)
+        s5 = await pg.evaluate(SCH)
+        check('gắn vào tháng: có tháng cũ vừa gắn, số dư thẻ không đổi', any(r['month'] == month_shift(-8).strftime('%Y-%m') and r['txId'] for r in s5['rows']) and s5['bal'] == s4['bal'], (s4['bal'], s5['bal']))
+        check('gắn xong: lời nhắc biến mất', await pg.get_by_test_id('sch-orphans').count() == 0)
+
+        # (5) Sửa một khoản thu thường thành Học bổng: khoản đó được nhận làm giao dịch của tháng (không nhân đôi)
+        tid = await pg.evaluate("""async () => { const s = window.__qltc.store;
+          const cat = s.all('categories').find(c => c.type === 'income' && c.name === 'Thu khác');
+          const acc = s.all('accounts').find(x => x.currency === 'RUB' && x.kind !== 'savings');
+          return (await s.put('txs', { date: '%s-05', kind: 'income', amount: 15000, currency: 'RUB', accountId: acc.id, categoryId: cat.id, note: '' })).id; }""" % month_shift(4).strftime('%Y-%m'))
+        n_before = await pg.evaluate("window.__qltc.store.all('txs').length")
+        bal_before = (await pg.evaluate(SCH))['bal']
+        await pg.evaluate(f"window.__qltc.forms.openTxForm({{ tx: window.__qltc.store.byId('txs', '{tid}') }})")
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        await d.locator('div[data-slot=field]', has_text='Danh mục').first.locator('button, [role=combobox]').first.click()
+        await pg.wait_for_timeout(300)
+        await pg.get_by_role('option', name='Học bổng').first.click()
+        await pg.wait_for_timeout(400)
+        await d.get_by_role('button', name='Lưu').last.click()
+        await pg.wait_for_timeout(700)
+        linked = await pg.evaluate(f"!!window.__qltc.store.byId('txs', '{tid}').scholarshipId")
+        check('sửa khoản thu thường sang Học bổng: khoản được gắn vào tháng, không nhân đôi', linked and await pg.evaluate("window.__qltc.store.all('txs').length") == n_before and (await pg.evaluate(SCH))['bal'] == bal_before)
+
+        # (6) Sửa khoản thu sang Học bổng khi tháng đó đã có khoản riêng: chặn, báo rõ
+        dup = await pg.evaluate("""async () => { const s = window.__qltc.store;
+          const cat = s.all('categories').find(c => c.type === 'income' && c.name === 'Học bổng');
+          const acc = s.all('accounts').find(x => x.currency === 'RUB' && x.kind !== 'savings');
+          return (await s.put('txs', { date: '%s-20', kind: 'income', amount: 15000, currency: 'RUB', accountId: acc.id, categoryId: cat.id, note: 'trùng tháng đã có' })).id; }""" % MA)
+        await pg.evaluate(f"window.__qltc.forms.openTxForm({{ tx: window.__qltc.store.byId('txs', '{dup}') }})")
+        await pg.wait_for_timeout(600)
+        d = pg.locator('[role=dialog]').last
+        check('khoản trùng tháng đã có: ô học bổng báo rõ và chặn lưu', 'đã có khoản học bổng' in await d.get_by_test_id('sch-info').inner_text())
+        before_rows = len((await pg.evaluate(SCH))['rows'])
+        await d.get_by_role('button', name='Lưu').last.click()
+        await pg.wait_for_timeout(500)
+        check('bấm Lưu khi trùng tháng: hộp thoại còn mở, không thêm tháng', await dialog_count(pg) == 1 and len((await pg.evaluate(SCH))['rows']) == before_rows)
+        # bỏ tick → lưu như khoản thu thường
+        await d.get_by_test_id('sch-sync').get_by_role('checkbox').first.click()
+        await pg.wait_for_timeout(300)
+        await d.get_by_role('button', name='Lưu').last.click()
+        await pg.wait_for_timeout(500)
+        check('bỏ tick ô học bổng: lưu được như khoản thu thường', await dialog_count(pg) == 0)
+        check('console sạch (Học bổng)', not pg.logs, pg.logs[:3])
         await pg.context.close()
 
         # ── Máy tính 1280×800 ──────────────────────────────────────────────

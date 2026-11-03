@@ -70,3 +70,32 @@ test('khoản lỗi hoặc lệch tiền tệ bị bỏ qua; mốc thời gian t
   assert.equal(docs.length, 1);
   assert.equal(docs[0].ts, 1001);
 });
+
+test('khoản học bổng (schActive): không tạo khoản thu rời, chỉ còn khoản gửi bố trừ vào thẻ ₽ của khoản, đúng ngày nhận', () => {
+  const [it] = withState('+học bổng 15000 rub');
+  const item = { ...it, schActive: true, sch: { on: true, month: '', availableDate: '2026-10-29', receivedDate: '2026-11-02', accountId: 'gaz' }, home: { on: true, manual: 5000, bad: false, text: '' } };
+  const { docs, sent } = buildQuickDocs({ items: [item], account: MB, date: '2026-11-05', familyCategoryId: 'fam' });
+  assert.equal(sent, 1);
+  assert.equal(docs.length, 1);
+  assert.equal(docs[0].kind, 'expense');
+  assert.equal(docs[0].accountId, 'gaz'); // thẻ ₽ nhận học bổng, không phải MB của hộp thoại
+  assert.equal(docs[0].currency, 'RUB');
+  assert.equal(docs[0].date, '2026-11-02'); // ngày nhận riêng của khoản
+  assert.equal(docs[0].amount, 5000);
+});
+
+test('khoản học bổng không gửi bố: không sinh giao dịch nào ở đây (khoản thu do mục Học bổng ghi)', () => {
+  const [it] = withState('+học bổng 15000 rub');
+  const item = { ...it, schActive: true, sch: { on: true, month: '', availableDate: '', receivedDate: '', accountId: 'gaz' } };
+  const { docs, sent } = buildQuickDocs({ items: [item], account: MB, date: '2026-11-05' });
+  assert.deepEqual(docs, []);
+  assert.equal(sent, 0);
+});
+
+test('khoản thu thường lẫn khoản học bổng: khoản thường vẫn được lưu như cũ', () => {
+  const items = withState('+học bổng 15000 rub; +làm thêm 500k').map((x, i) => (i === 0 ? { ...x, schActive: true, sch: { on: true, accountId: 'gaz' } } : x));
+  const { docs } = buildQuickDocs({ items, account: MB, date: '2026-11-05' });
+  assert.equal(docs.length, 1);
+  assert.equal(docs[0].amount, 500000);
+  assert.equal(docs[0].accountId, 'mb');
+});

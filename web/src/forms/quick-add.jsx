@@ -19,7 +19,8 @@ import { CalcPad } from '@/components/ui/calc-pad.jsx';
 import { MoneyInput } from '@/components/ui/money-input.jsx';
 import { InfoNote } from '@/components/forms/pickers.jsx';
 import { QuickItem, QuickErrorRow } from '@/components/forms/quick-item.jsx';
-import { buildItems, catByName, homeKey, SHARE_PEOPLE_KEY } from '@/components/forms/quick-helpers.js';
+import { buildItems, catByName, homeKey, settleItem, schEntryOf, schProblemOf, SHARE_PEOPLE_KEY } from '@/components/forms/quick-helpers.js';
+import { saveScholarshipEntry } from '@logic/scholarship.js';
 import { NO_ACCOUNT_LABEL, NO_ACCOUNT_NOTE } from './constants.js';
 
 const nameOf = (id) => (partyById(id) || {}).name || '?';
@@ -54,7 +55,9 @@ function QuickAdd({ initialText, income }) {
     setCalcOpen(false);
   };
 
-  const patch = (uid, p) => setItems((all) => all.map((x) => (x.uid === uid ? { ...x, ...p } : x)));
+  // Đổi danh mục sang / khỏi «Học bổng» thì tiền tệ và thẻ của khoản đổi theo → settleItem tính lại.
+  const patch = (uid, p) => setItems((all) => all.map((x) => (x.uid === uid ? settleItem({ ...x, ...p }, account) : x)));
+  const patchSch = (uid, p) => setItems((all) => all.map((x) => (x.uid === uid ? settleItem({ ...x, sch: { ...x.sch, ...p } }, account) : x)));
   const patchDebt = (uid, p) => setItems((all) => all.map((x) => (x.uid === uid ? { ...x, debt: { ...x.debt, ...p } } : x)));
   const patchHome = (uid, p) => setItems((all) => all.map((x) => (x.uid === uid ? { ...x, home: { ...x.home, ...p } } : x)));
   const remove = (uid) => patch(uid, { dropped: true });
@@ -71,7 +74,8 @@ function QuickAdd({ initialText, income }) {
 
   const shown = items.filter((x) => !x.dropped);
   const droppedCount = items.length - shown.length;
-  const okItems = shown.filter(itemOk);
+  const problemOf = (x) => schProblemOf(x, date);
+  const okItems = shown.filter((x) => itemOk(x) && !problemOf(x));
   const bad = shown.length - okItems.length;
   const noAcc = !account;
 
@@ -80,14 +84,25 @@ function QuickAdd({ initialText, income }) {
     const { docs, shared, sent, lastPeople } = buildQuickDocs({
       items: okItems, account, date, nameOf, familyCategoryId: (catByName('Biếu gia đình', 'expense') || {}).id || '',
     });
+    const schItems = okItems.filter((x) => x.schActive);
     try {
-      await store.putMany('txs', docs);
+      // Học bổng ghi trước: lưu lại lần nữa chỉ cập nhật đúng tháng đó nên thử lại không bị cộng đôi.
+      let created = 0; let updated = 0;
+      for (const x of schItems) {
+        const r = await saveScholarshipEntry(schEntryOf(x, date));
+        if (r.updated) updated += 1; else created += 1;
+      }
+      if (docs.length) await store.putMany('txs', docs);
       if (account) lsSet('qltc:lastAccount', account.id);
       if (lastPeople) lsSet(SHARE_PEOPLE_KEY, JSON.stringify(lastPeople));
       for (const i of okItems) if (i.kind === 'income') lsSet(homeKey(i.categoryId), i.home && i.home.on ? '1' : '0');
       close();
-      const extra = [shared ? `${shared} khoản gắn với Vay nợ` : '', sent ? `${sent} khoản gửi ${HOME_NAME}` : ''].filter(Boolean).join(', ');
-      toast(`Đã lưu ${docs.length} giao dịch${extra ? ` (${extra})` : ''}.`, 'ok');
+      const extra = [
+        shared ? `${shared} khoản gắn với Vay nợ` : '',
+        sent ? `${sent} khoản gửi ${HOME_NAME}` : '',
+        created + updated ? `${created + updated} khoản vào mục Học bổng MIIGAiK${updated ? ` (${updated} tháng đã có được cập nhật)` : ''}` : '',
+      ].filter(Boolean).join(', ');
+      toast(`Đã lưu ${docs.length + created + updated} giao dịch${extra ? ` (${extra})` : ''}.`, 'ok');
     } catch (e) { toast(errMsg(e), 'error'); }
   }
 
@@ -138,7 +153,7 @@ function QuickAdd({ initialText, income }) {
           <AnimatePresence initial={false}>
             {shown.map((it, i) => (it.error
               ? <QuickErrorRow key={it.uid} item={it} />
-              : <QuickItem key={it.uid} item={it} index={i} account={account} onPatch={patch} onPatchDebt={patchDebt} onPatchHome={patchHome} onRemove={remove} onApplyAll={applyAll} />))}
+              : <QuickItem key={it.uid} item={it} index={i} account={account} dialogDate={date} schProblem={problemOf(it)} onPatch={patch} onPatchDebt={patchDebt} onPatchHome={patchHome} onPatchSch={patchSch} onRemove={remove} onApplyAll={applyAll} />))}
           </AnimatePresence>
         </div>
         {droppedCount ? (

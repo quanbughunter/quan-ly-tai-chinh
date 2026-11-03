@@ -156,7 +156,13 @@ Mỗi tháng một dòng, mặc định **15.000 ₽** (đổi được trong C�
 | Đã nhận + chọn thẻ (Gazprom hoặc PSPB… — mọi thẻ ₽ trừ sổ tiết kiệm) | Ghi **một khoản thu ₽** vào thẻ đó, đúng **ngày thực nhận**; số dư thẻ tăng đúng số tiền |
 | Đã nhận + «Không cộng vào thẻ nào» | Không (dành cho tháng cũ mà số dư thẻ đã tính sẵn) |
 
-- Khoản thu gắn với tháng qua `scholarshipId`/`txId`: **đổi** số tiền, ngày hoặc thẻ thì khoản tự cập nhật; **bỏ tick «Đã nhận»** hoặc **xóa tháng** thì khoản tự biến mất. Khoản này không sửa tay ở màn hình Giao dịch (app dẫn về tháng gốc) — nên đừng thêm lại học bổng ở mục Giao dịch, sẽ bị tính hai lần.
+- Khoản thu gắn với tháng qua `scholarshipId`/`txId`: **đổi** số tiền, ngày hoặc thẻ thì khoản tự cập nhật; **bỏ tick «Đã nhận»** hoặc **xóa tháng** thì khoản tự biến mất. Khoản này không sửa tay ở màn hình Giao dịch (app dẫn về tháng gốc).
+- **Thêm học bổng từ nơi khác cũng tự vào mục này.** Khoản thu chọn danh mục «Học bổng» (nút «＋» → Khoản thu / Nhập nhanh, nút Thêm ở tab Giao dịch → Thu, ô nhập ở Tổng quan) không còn là khoản thu rời: hộp thoại hiện ô **«Ghi vào mục Học bổng MIIGAiK»** để nhập **ngày học bổng «có»**, **ngày thực nhận** (ô «Ngày» của form, hoặc ô riêng trong Nhập nhanh), **tháng** (mặc định theo ngày có, chưa có thì theo ngày nhận) và thẻ ₽. Lưu xong, mục Học bổng có đúng một dòng tháng + một khoản thu ₽ vào thẻ.
+  - Mỗi tháng chỉ một dòng: tháng đang chờ thì được đánh dấu đã nhận (giữ ngày có cũ nếu để trống); tháng đã nhận thì được cập nhật chứ **không cộng lần hai**. Học bổng luôn tính bằng ₽ và vào thẻ ₽ (không phải sổ tiết kiệm); chọn danh mục này thì form tự chuyển sang thẻ học bổng chọn sẵn. Ngày có không được sau ngày nhận.
+  - Bỏ tick ô «Ghi vào mục Học bổng» nếu chỉ muốn ghi một khoản thu thường (ví dụ học bổng khác, không phải MIIGAiK).
+  - Sửa một khoản thu cũ sang danh mục «Học bổng»: khoản đó được chuyển thành giao dịch của tháng (không tạo thêm khoản). Nếu tháng đó đã có khoản riêng thì form báo và chặn lưu, để khỏi tính hai lần.
+  - Các khoản thu «Học bổng» (₽) nhập từ trước chưa gắn tháng nào: mục Học bổng hiện lời nhắc **«Gắn … khoản vào các tháng»** (tạo tháng theo ngày của khoản, số dư thẻ không đổi). Khoản trùng với tháng đã có thì để nguyên cho bạn tự xử lý.
+  - Logic thuần và có kiểm thử: `validateScholarshipEntry`, `planScholarshipEntry`, `planAdoption`… trong `web/js/scholarship.js`; hộp «Ghi vào mục Học bổng» dùng chung ở `web/src/components/forms/scholarship-sync.jsx`.
 - Thẻ chọn sẵn là thẻ bạn chọn lần trước; lần đầu là thẻ có tên chứa "Gazprom", rồi "PSPB". Cài đặt có ô chọn thẻ mặc định.
 - 14 tháng nhập từ sheet cũ giữ nguyên, **không** có khoản cộng nào (số dư thẻ trong sheet cũ đã khớp). Khi mở một tháng cũ chưa nhận mà tick «Đã nhận», thẻ được chọn sẵn như tháng mới.
 

@@ -3,9 +3,13 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Check, Trash2 } from 'lucide-react';
 import { store, useStore } from '@/lib/store-hooks.js';
 import { TX_KINDS } from '@logic/model.js';
-import { todayStr } from '@logic/dates.js';
-import { fmtNum, impliedRate } from '@logic/money.js';
+import { todayStr, monthLabel } from '@logic/dates.js';
+import { fmtNum, fmtMoney, impliedRate } from '@logic/money.js';
 import { newDebt, planOf, buildQuickDocs } from '@logic/quicksave.js';
+import {
+  SCHOLARSHIP_NAME, isScholarshipCategory, isReceivingAccount, defaultScholarshipAccountId, resolveScholarshipInput,
+  validateScholarshipEntry, saveScholarshipEntry, scholarshipClash,
+} from '@logic/scholarship.js';
 import { openDialog, useDialog, confirmBox } from '@/lib/dialogs.jsx';
 import { toast } from '@/lib/toast.js';
 import { errMsg } from '@/lib/format.js';
@@ -20,6 +24,7 @@ import { Segmented } from '@/components/ui/segmented.jsx';
 import { MoneyInput, readAmount } from '@/components/ui/money-input.jsx';
 import { SelectWithAdd, InfoNote } from '@/components/forms/pickers.jsx';
 import { ShareDebt } from '@/components/forms/quick-item.jsx';
+import { ScholarshipSync } from '@/components/forms/scholarship-sync.jsx';
 import { SHARE_ME_KEY, SHARE_PEOPLE_KEY } from '@/components/forms/quick-helpers.js';
 import { DEBT_KINDS, NO_ACCOUNT_LABEL, NO_ACCOUNT_NOTE } from './constants.js';
 import { openAccountForm } from './account-form.jsx';
@@ -62,6 +67,8 @@ function initialState(init, t, defAcc) {
     note: t ? t.note || '' : '',
     // Chia khoản chi cho người trong Vay nợ (chỉ khi thêm mới khoản chi).
     debt: { ...newDebt({ includeMe: lsGet(SHARE_ME_KEY) !== '0' }), text: {} },
+    // Khoản thu danh mục «Học bổng» ghi vào mục Học bổng MIIGAiK. Sửa khoản thu cũ ở thẻ không phải ₽ thì mặc định tắt để vẫn lưu được.
+    sch: { on: t ? isReceivingAccount(accById(t.accountId)) : true, month: '', availableDate: '' },
   };
 }
 
@@ -87,6 +94,13 @@ function TxForm({ init }) {
   const shareOn = canShare && st.debt.mode !== 'none';
   // Trừ nợ, hoặc cộng nợ mà không tính phần của mình: không còn khoản chi nào để phân loại.
   const hideCat = shareOn && (st.debt.mode === 'sub' || !st.debt.includeMe);
+  // Khoản thu chọn danh mục «Học bổng»: đồng bộ sang mục Học bổng MIIGAiK (tháng + ngày có + ngày nhận), không tạo khoản thu rời.
+  const isSch = group === 'income' && isScholarshipCategory(st.categoryId);
+  const schOn = isSch && st.sch.on;
+  const schInput = resolveScholarshipInput(st.sch, st.date);
+  const schProblem = schOn
+    ? validateScholarshipEntry({ ...schInput, amount: readAmount(st.amount, cur) || 1, accountId: st.accountId }, store.all('accounts')) || scholarshipClash(schInput.month, t ? t.id : '')
+    : '';
 
   const setGroup = (v) => setSt((s) => {
     const n = { ...s, group: v };
@@ -101,6 +115,16 @@ function TxForm({ init }) {
     return { ...s, accountId: v, currency: next, debt: next === s.currency ? s.debt : resetShares(s.debt) };
   });
   const patchDebt = (p) => setSt((s) => ({ ...s, debt: { ...s.debt, ...p } }));
+  const patchSch = (p) => setSt((s) => ({ ...s, sch: { ...s.sch, ...p } }));
+  // Chọn «Học bổng» mà tài khoản chưa phải thẻ ₽ → chuyển sang thẻ ₽ nhận học bổng (nếu có) để khỏi nhập sai tiền tệ.
+  const setCategory = (v) => setSt((s) => {
+    const n = { ...s, categoryId: v };
+    if (s.group === 'income' && isScholarshipCategory(v) && !isReceivingAccount(accById(s.accountId))) {
+      const acc = accById(defaultScholarshipAccountId());
+      if (acc) { n.accountId = acc.id; n.currency = acc.currency; }
+    }
+    return n;
+  });
 
   const amtLabel = group === 'adjust' ? 'Số tiền điều chỉnh (+ hoặc −)' : cross ? 'Số tiền ghi nợ' : 'Số tiền';
   const amtNum = readAmount(st.amount, cur);
@@ -123,6 +147,7 @@ function TxForm({ init }) {
     if (!isDebt && !canNone && !a) return toast('Chọn tài khoản.', 'error');
     if (isDebt && !st.partyId) return toast('Chọn người liên quan đến khoản vay nợ.', 'error');
     if (shareOn) return onSaveShared(amount);
+    if (schOn) return onSaveScholarship(amount);
     const doc = {
       id: t ? t.id : undefined, ts: t ? t.ts : undefined,
       date: st.date, kind, amount, currency: debtCur || (a ? a.currency : st.currency),
@@ -150,6 +175,20 @@ function TxForm({ init }) {
       if (a) lsSet('qltc:lastAccount', a.id);
       close();
       toast(t ? 'Đã cập nhật giao dịch.' : 'Đã lưu giao dịch.', 'ok');
+    } catch (e) { toast(errMsg(e), 'error'); }
+  }
+
+  // Thu + danh mục Học bổng: ghi vào mục Học bổng MIIGAiK (tháng mới hoặc cập nhật tháng đã có) cùng khoản thu ₽ vào thẻ.
+  // Đang sửa một khoản thu cũ thì khoản đó được chuyển thành giao dịch của tháng (không tạo thêm → không bị tính hai lần).
+  async function onSaveScholarship(amount) {
+    if (schProblem) return toast(schProblem, 'error');
+    try {
+      const { item, updated } = await saveScholarshipEntry(
+        { ...schInput, amount, accountId: st.accountId, note: st.note.trim() },
+        { adoptTxId: t ? t.id : '' },
+      );
+      close();
+      toast(`${updated ? 'Đã cập nhật' : 'Đã thêm'} ${monthLabel(item.month).toLowerCase()} ở mục ${SCHOLARSHIP_NAME}: +${fmtMoney(amount, cur)} vào ${a ? a.name : 'thẻ'}.`, 'ok');
     } catch (e) { toast(errMsg(e), 'error'); }
   }
 
@@ -198,7 +237,7 @@ function TxForm({ init }) {
         ) : null}
 
         <FieldRow>
-          <Field label="Ngày"><Input type="date" value={st.date} onChange={(e) => patch({ date: e.target.value })} /></Field>
+          <Field label={schOn ? 'Ngày thực nhận' : 'Ngày'}><Input type="date" value={st.date} onChange={(e) => patch({ date: e.target.value })} /></Field>
           <Field label={group === 'transfer' ? 'Từ tài khoản' : 'Tài khoản'}>
             <SelectWithAdd
               options={accountOptions({ none: canNone ? NO_ACCOUNT_LABEL : null })}
@@ -264,9 +303,11 @@ function TxForm({ init }) {
 
         {(group === 'expense' || group === 'income') && !hideCat ? (
           <Field label="Danh mục">
-            <Select options={categoryOptions(group)} value={st.categoryId} onChange={(v) => patch({ categoryId: v })} />
+            <Select options={categoryOptions(group)} value={st.categoryId} onChange={setCategory} />
           </Field>
         ) : null}
+
+        {isSch ? <ScholarshipSync sch={st.sch} onChange={patchSch} receivedDate={st.date} problem={schProblem} /> : null}
 
         <Field label="Ghi chú">
           <Input value={st.note} placeholder="Ví dụ: ăn trưa, tiền nhà…" onChange={(e) => patch({ note: e.target.value })} />

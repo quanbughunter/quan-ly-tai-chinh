@@ -5,6 +5,7 @@ import { todayStr, fmtDate, daysBetween, monthLabel } from '@logic/dates.js';
 import {
   SCHOLARSHIP_NAME, SCHOLARSHIP_CURRENCY, isReceived, scholarshipAmount, defaultScholarshipAccountId,
   saveScholarship, removeScholarship, newScholarshipId, takeOpenScholarshipRequest,
+  orphanScholarshipTxs, planAdoption, scholarshipCategoryId, adoptOrphanScholarships,
 } from '@logic/scholarship.js';
 import { store, useStore } from '@/lib/store-hooks.js';
 import { money, errMsg, fmtNum, fmtMoney } from '@/lib/format.js';
@@ -55,7 +56,7 @@ function ScholarshipForm({ x }) {
   let hint = '';
   if (received) {
     if (!accountId) hint = linkedTx ? 'Bỏ chọn thẻ sẽ xóa khoản đã cộng trước đây khỏi số dư thẻ.' : 'Không ghi khoản thu nào — dùng khi số dư thẻ đã tính sẵn học bổng này.';
-    else hint = `Số dư thẻ sẽ tăng ${Number.isFinite(v) && v > 0 ? fmtMoney(v, SCHOLARSHIP_CURRENCY) : 'đúng số tiền nhận'}. App tự ghi khoản thu này — đừng thêm lại ở mục Giao dịch.`;
+    else hint = `Số dư thẻ sẽ tăng ${Number.isFinite(v) && v > 0 ? fmtMoney(v, SCHOLARSHIP_CURRENCY) : 'đúng số tiền nhận'}. App tự ghi khoản thu này. Thêm khoản thu danh mục «Học bổng» ở Thêm giao dịch / Nhập nhanh cũng tự vào đúng tháng ở đây.`;
   }
 
   const onReceivedChange = (checked) => {
@@ -144,9 +145,20 @@ export default function Scholarship() {
     const avg = delays.length ? delays.reduce((a, b) => a + b, 0) / delays.length : null;
     const posted = list.filter((x) => x.txId && store.byId('txs', x.txId));
     const postedTotal = posted.reduce((s, x) => s + (Number(store.byId('txs', x.txId).amount) || 0), 0);
-    return { list, waiting, avg, posted, postedTotal };
+    // Khoản thu «Học bổng» nhập từ trước (chưa gắn tháng nào): gắn được bao nhiêu, bao nhiêu khoản trùng tháng phải tự xử lý.
+    const orphans = orphanScholarshipTxs(store.all('txs'), store.all('accounts'), scholarshipCategoryId());
+    const plan = planAdoption(orphans, store.all('scholarships'), store.all('txs'));
+    return { list, waiting, avg, posted, postedTotal, plan };
   }, [ver]);
-  const { list, waiting, avg, posted, postedTotal } = view;
+  const { list, waiting, avg, posted, postedTotal, plan } = view;
+  const [adopting, setAdopting] = useState(false);
+  const adopt = async () => {
+    setAdopting(true);
+    try {
+      const r = await adoptOrphanScholarships();
+      toast(`Đã gắn ${r.done} khoản vào các tháng${r.skipped ? `; ${r.skipped} khoản trùng tháng đã có, hãy tự kiểm tra ở mục Giao dịch` : ''}.`, 'ok');
+    } catch (e) { toast(errMsg(e), 'error'); } finally { setAdopting(false); }
+  };
 
   return (
     <div className="grid gap-4">
@@ -168,6 +180,18 @@ export default function Scholarship() {
           </p>
         </CardContent>
       </Card>
+
+      {plan.adopt.length || plan.skipped.length ? (
+        <Card data-testid="sch-orphans">
+          <CardContent className="grid gap-3 pt-4 sm:pt-5">
+            <p className="text-[14px] leading-relaxed">
+              {plan.adopt.length ? `Có ${plan.adopt.length} khoản thu danh mục «Học bổng» (₽) nhập từ trước chưa gắn với tháng nào ở đây — gắn vào để bảng này khớp.` : ''}
+              {plan.skipped.length ? `${plan.adopt.length ? ' ' : ''}${plan.skipped.length} khoản khác trùng với tháng đã có nên không tự gắn được; kiểm tra ở mục Giao dịch để khỏi tính hai lần.` : ''}
+            </p>
+            {plan.adopt.length ? <div><Button variant="soft" size="sm" onClick={adopt} disabled={adopting}>{`Gắn ${plan.adopt.length} khoản vào các tháng`}</Button></div> : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {!list.length ? (
         <Card><EmptyState icon={GraduationCap}>Chưa có tháng nào. Bấm “Thêm tháng”, tick “Đã nhận” và chọn thẻ để cộng học bổng vào số dư.</EmptyState></Card>

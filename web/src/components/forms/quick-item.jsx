@@ -19,6 +19,7 @@ import { Segmented } from '@/components/ui/segmented.jsx';
 import { CheckRow } from '@/components/ui/checkbox.jsx';
 import { openPartyForm } from '@/forms/party-form.jsx';
 import { SHARE_ME_KEY, sharePartyList, lastSharePeople } from './quick-helpers.js';
+import { ScholarshipSync } from './scholarship-sync.jsx';
 
 const SHARE_MODE_OPTS = [
   { value: 'none', label: 'Không chia' },
@@ -215,15 +216,16 @@ export function ShareDebt({ item: it, patchDebt, onApplyAll }) {
 }
 
 /**
- * item: một khoản đã đọc; account: tài khoản đang chọn (null = không gắn).
- * onPatch(uid, partial) · onPatchDebt(uid, partial) · onPatchHome(uid, partial) · onRemove(uid) · onApplyAll(uid)
+ * item: một khoản đã đọc; account: tài khoản đang chọn (null = không gắn); dialogDate: ngày của hộp thoại (ngày nhận học bổng mặc định);
+ * schProblem: lỗi đang chặn khoản học bổng này.
+ * onPatch(uid, partial) · onPatchDebt(uid, partial) · onPatchHome(uid, partial) · onPatchSch(uid, partial) · onRemove(uid) · onApplyAll(uid)
  */
-export function QuickItem({ item: it, account, onPatch, onPatchDebt, onPatchHome, onRemove, onApplyAll, index = 0 }) {
+export function QuickItem({ item: it, account, dialogDate = '', schProblem = '', onPatch, onPatchDebt, onPatchHome, onPatchSch, onRemove, onApplyAll, index = 0 }) {
   const isIncome = it.kind === 'income';
   const d = it.debt;
   const dplan = isIncome ? { ok: true } : planOf(it);
   const hplan = isIncome ? homePlanOf(it) : { ok: true };
-  const bad = it.mismatch || (!isIncome && d.mode !== 'none' && !dplan.ok) || (isIncome && it.home.on && !hplan.ok);
+  const bad = it.mismatch || !!schProblem || (!isIncome && d.mode !== 'none' && !dplan.ok) || (isIncome && it.home.on && !hplan.ok);
   const hideCat = !isIncome && (d.mode === 'sub' || (d.mode === 'add' && !d.includeMe));
   let badge = { text: 'Chi', variant: 'neutral' };
   if (isIncome) badge = { text: 'Thu', variant: 'success' };
@@ -250,6 +252,7 @@ export function QuickItem({ item: it, account, onPatch, onPatchDebt, onPatchHome
         <Input value={it.note} aria-label="Ghi chú" placeholder="Ghi chú" onChange={(e) => onPatch(it.uid, { note: e.target.value })} />
         {hideCat ? null : <Select aria-label="Danh mục" options={categoryOptions(it.kind, '—')} value={it.categoryId} onChange={(v) => onPatch(it.uid, { categoryId: v })} />}
       </div>
+      {isIncome && it.sch ? <ScholarshipSync sch={it.sch} onChange={(p) => onPatchSch(it.uid, p)} receivedDate={dialogDate} showReceived showCard problem={schProblem} /> : null}
       {it.mismatch ? (
         <p className="text-xs font-medium text-destructive">Khác tiền tệ của tài khoản đã chọn ({account && account.currency}) nên khoản này sẽ không được lưu. Đổi tài khoản, hoặc chọn “Không gắn tài khoản”.</p>
       ) : isIncome ? (

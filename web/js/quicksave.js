@@ -33,7 +33,7 @@ export const itemOk = (it) => !it.error && !it.mismatch && planOf(it).ok && home
 
 /**
  * @param {object} p
- * @param {Array} p.items       các khoản (xem parseQuick + debt/home); khoản lỗi / lệch tiền tệ bị bỏ qua
+ * @param {Array} p.items       các khoản (xem parseQuick + debt/home); khoản lỗi / lệch tiền tệ bị bỏ qua; khoản schActive (học bổng) chỉ sinh khoản gửi bố
  * @param {object|null} p.account  tài khoản nhận; null = không gắn tài khoản
  * @param {string} p.date
  * @param {(id:string)=>string} [p.nameOf]   tên người theo id (cho ghi chú chia nợ)
@@ -50,6 +50,16 @@ export function buildQuickDocs({ items, account = null, date, nameOf = (id) => i
   let lastPeople = null;
   const ts = () => now() + (n += 1);
   for (const i of items.filter(itemOk)) {
+    if (i.schActive) {
+      // Khoản học bổng: khoản thu do mục Học bổng MIIGAiK ghi (saveScholarshipEntry) nên ở đây không tạo khoản thu rời,
+      // chỉ còn khoản gửi bố (nếu có) — trừ vào đúng thẻ ₽ đã nhận học bổng, đúng ngày nhận.
+      const hp = homePlanOf(i);
+      if (i.home && i.home.on && hp.ok) {
+        docs.push({ ...buildSendHomeTx({ date: (i.sch && i.sch.receivedDate) || date, amount: hp.amount, currency: i.currency, accountId: i.sch ? i.sch.accountId : accountId, categoryId: familyCategoryId, note: i.note, toName: HOME_NAME }), ts: ts() });
+        sent += 1;
+      }
+      continue;
+    }
     if (!i.debt || i.debt.mode === 'none') {
       docs.push({ date, kind: i.kind, amount: i.amount, currency: i.currency, accountId, categoryId: i.categoryId || '', note: i.note, ts: ts() });
       if (i.kind === 'income') {
