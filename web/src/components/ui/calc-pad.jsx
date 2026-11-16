@@ -16,7 +16,8 @@ const KEYS = [
   { k: 'k', t: 'k', label: 'nghìn', cls: FUNC }, { k: 'tr', t: 'tr', label: 'triệu', cls: FUNC }, { k: 'tỷ', t: 'tỷ', label: 'tỷ', cls: FUNC },
 ];
 
-const keyCls = 'tnum h-11 select-none rounded-xl text-[17px] font-semibold outline-none transition-all duration-100 active:scale-95 focus-visible:ring-[3px] focus-visible:ring-ring/40';
+// inline-flex + căn giữa: Tailwind đặt svg là display:block nên biểu tượng (⌫) không tự canh giữa như chữ trong nút.
+const keyCls = 'tnum inline-flex h-11 select-none items-center justify-center rounded-xl text-[17px] font-semibold outline-none transition-all duration-100 active:scale-95 focus-visible:ring-[3px] focus-visible:ring-ring/40';
 
 /**
  * Bàn phím máy tính cho một ô nhập tiền kiểu chuỗi: value (string) + onChange(string).
