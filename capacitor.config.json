@@ -1,7 +1,7 @@
 {
   "appId": "com.quanbughunter.quanlytaichinh",
   "appName": "Quản lý tài chính",
-  "webDir": "web",
+  "webDir": "dist",
   "server": {
     "androidScheme": "https"
   },

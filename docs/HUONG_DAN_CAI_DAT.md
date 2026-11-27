@@ -22,7 +22,7 @@ Làm theo thứ tự. Mỗi bước có cách kiểm tra "đã xong chưa". Toà
 ## Bước 3. Điền cấu hình kết nối
 
 1. **Project Settings → API** (hoặc *Data API*): chép **Project URL** và khóa **anon / publishable** (khóa công khai).
-2. Mở `web/config.js`, dán vào:
+2. Mở `web/public/config.js`, dán vào:
 
    ```js
    window.APP_CONFIG = {
@@ -33,13 +33,13 @@ Làm theo thứ tự. Mỗi bước có cách kiểm tra "đã xong chưa". Toà
 
 > **Tuyệt đối không** dán khóa `service_role` hay `secret` vào file này. Khóa anon/publishable được phép công khai vì dữ liệu được bảo vệ bằng đăng nhập + RLS.
 
-Muốn thử trước khi kết nối? Để `config.js` trống: app chạy ở "chế độ thử" với dữ liệu giả, chỉ lưu trong trình duyệt. Chạy thử bằng `npm run serve` rồi mở <http://localhost:8080>.
+Muốn thử trước khi kết nối? Để `config.js` trống: app chạy ở "chế độ thử" với dữ liệu giả, chỉ lưu trong trình duyệt. Chạy thử: `npm install` (một lần), rồi `npm run dev` và mở <http://localhost:5173> (sửa mã là thấy ngay), hoặc `npm run serve` để dựng bản thật và mở <http://localhost:8080>.
 
 ## Bước 4. Đẩy mã lên GitHub
 
 0. Trong thư mục dự án, chạy một lần: `npm run setup:workflows`. Lệnh này chép hai file workflow từ `setup/github-workflows/` vào `.github/workflows/` (GitHub chỉ chạy workflow ở đó).
 1. GitHub Desktop → **File → Add local repository** → chọn thư mục `D:\C1.CODING\myAPP\quan-ly-tai-chinh`. Nếu nó hỏi tạo repository, đồng ý.
-2. Kiểm tra danh sách file thay đổi: **không được có** `private/`, `*.xlsx`, `src/`, `.clasp.json`, `node_modules/` (đã nằm trong `.gitignore`). Nếu thấy chúng, dừng lại và hỏi.
+2. Kiểm tra danh sách file thay đổi: **không được có** `private/`, `*.xlsx`, `.clasp.json`, `node_modules/`, `dist/` (đã nằm trong `.gitignore`). Thư mục `web/src/` (mã giao diện React) thì **phải có**. Nếu thấy chúng, dừng lại và hỏi.
 3. **Commit to main** → **Publish repository** (đặt tên, ví dụ `quan-ly-tai-chinh`). Repo công khai cũng được, vì mã nguồn không chứa dữ liệu của bạn.
 
 ## Bước 5. Bật GitHub Pages (bản web)
@@ -49,7 +49,7 @@ Muốn thử trước khi kết nối? Để `config.js` trống: app chạy ở
 3. Khi xong, địa chỉ web là `https://<tên-tài-khoản>.github.io/<tên-repo>/`. Mở lên, đăng nhập bằng tài khoản ở Bước 2.
    - Trên điện thoại: mở địa chỉ đó bằng Chrome → menu ⋮ → **Cài đặt ứng dụng / Thêm vào màn hình chính** để dùng như app.
 
-**Cách khác để điền cấu hình:** thay vì sửa `config.js` trong git, vào repo → **Settings → Secrets and variables → Actions → Variables** → tạo hai biến `SUPABASE_URL` và `SUPABASE_ANON_KEY`. Workflow sẽ ghi đè `config.js` lúc build.
+**Cách khác để điền cấu hình:** thay vì sửa `config.js` trong git, vào repo → **Settings → Secrets and variables → Actions → Variables** → tạo hai biến `SUPABASE_URL` và `SUPABASE_ANON_KEY`. Workflow sẽ ghi đè `web/public/config.js` lúc build.
 
 ## Bước 6. Nhập dữ liệu từ file Excel cũ
 
@@ -83,7 +83,7 @@ Icon app là logo QLTC (nền chàm; Q và C chồng lên nhau, L và T chung m�
 ### Khi nào cần dựng lại APK, khi nào không
 
 - **Không cần APK mới:** thêm/sửa tài khoản ngân hàng, người vay, danh mục, giao dịch… Tất cả là *dữ liệu* nhập ngay trong app (trên điện thoại hay web), lưu vào Supabase, hiện ngay ở mọi thiết bị. Ví dụ mở thêm thẻ BIDV: **Tài khoản → ＋ Thêm**, hoặc bấm **＋ Tài khoản mới** ngay trong form giao dịch.
-- **Cần APK mới:** chỉ khi *mã* của app thay đổi (thêm tính năng, sửa lỗi giao diện), vì app Android đóng gói sẵn bản sao thư mục `web/` tại thời điểm dựng. Bản web trên GitHub Pages thì tự cập nhật sau mỗi lần đẩy mã.
+- **Cần APK mới:** chỉ khi *mã* của app thay đổi (thêm tính năng, sửa lỗi giao diện), vì app Android đóng gói sẵn bản giao diện đã dựng (thư mục `dist/`) tại thời điểm dựng. Bản web trên GitHub Pages thì tự cập nhật sau mỗi lần đẩy mã.
 
 ### Cài bản mới đè bản cũ (không phải gỡ app)
 

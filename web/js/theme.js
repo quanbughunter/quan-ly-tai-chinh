@@ -1,4 +1,5 @@
 // Giao diện sáng / tối. Lưu lựa chọn trong localStorage (nếu có), mặc định theo hệ thống.
+// Luôn ghi data-theme = light | dark lên <html> (kể cả chế độ "theo máy") để CSS chỉ cần một nhánh.
 
 const KEY = 'qltc:theme';
 
@@ -11,12 +12,17 @@ export function setTheme(mode) {
   applyTheme();
 }
 
-export function applyTheme() {
+export function resolvedTheme() {
   const mode = getTheme();
+  if (mode === 'light' || mode === 'dark') return mode;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+export function applyTheme() {
+  const t = resolvedTheme();
   const root = document.documentElement;
-  if (mode === 'auto') root.removeAttribute('data-theme');
-  else root.setAttribute('data-theme', mode);
-  const dark = mode === 'dark' || (mode === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  root.setAttribute('data-theme', t);
+  root.style.colorScheme = t;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', dark ? '#1b1d2b' : '#f4f1fb');
+  if (meta) meta.setAttribute('content', t === 'dark' ? '#15141f' : '#f6f5fb');
 }

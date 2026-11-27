@@ -1,7 +1,7 @@
 """Logo QLTC: Q và C là hai vòng, L và T dùng chung một thanh ngang, đuôi chữ Q vắt qua góc chữ L.
 
 Chạy:  python3 tools/make_logo.py
-- Ghi web/icons/icon.svg và các SVG nguồn trong tools/logo/ (không cần thư viện nào).
+- Ghi web/public/icons/icon.svg và các SVG nguồn trong tools/logo/ (không cần thư viện nào).
 - Nếu máy có Playwright (pip install playwright && playwright install chromium) thì xuất luôn các file PNG.
   PNG đã có sẵn trong kho nên bước này chỉ cần khi bạn đổi màu / hình.
 """
@@ -10,7 +10,7 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WEB = os.path.join(ROOT, 'web', 'icons')
+WEB = os.path.join(ROOT, 'web', 'public', 'icons')
 ASSETS = os.path.join(ROOT, 'assets')            # chỉ chứa PNG cho @capacitor/assets (icon-only / icon-foreground / icon-background)
 SRC = os.path.join(ROOT, 'tools', 'logo')        # SVG nguồn trung gian
 for d in (WEB, ASSETS, SRC):

@@ -1,4 +1,5 @@
 node_modules/
+dist/
 private/
 *.xlsx
 *.xls
@@ -7,8 +8,9 @@ android/
 .env
 .DS_Store
 .clasp.json
-src/
+/src/
 
 # File APK/zip tải về từ GitHub Actions — không đưa lên kho
 *.apk
 quan-ly-tai-chinh-apk.zip
+ezPDF/

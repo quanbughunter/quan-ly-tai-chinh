@@ -1,14 +1,17 @@
 name: Dựng APK Android
 
 # Chạy tay: tab Actions → "Dựng APK Android" → Run workflow. Hoặc đẩy một tag dạng v1.0.0.
-# APK nằm ở mục Artifacts của lần chạy (tải về, giải nén, cài lên điện thoại).
+# Chạy xong, APK được đăng lên mục Releases của kho (tag v1.0.<số lần chạy>, đánh dấu "Latest"):
+#   - bản mới nhất luôn tải được ở https://github.com/<chủ kho>/<kho>/releases/latest
+#   - liên kết cố định tới file mới nhất: .../releases/latest/download/quan-ly-tai-chinh.apk
+# APK cũng còn ở mục Artifacts của lần chạy (giữ 30 ngày). Kho công khai nên Release cũng công khai.
 on:
   workflow_dispatch:
   push:
     tags: ['v*']
 
 permissions:
-  contents: read
+  contents: write   # cần để tạo tag + Release
 
 jobs:
   apk:
@@ -17,15 +20,21 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # lấy đủ lịch sử + tag để liệt kê "Thay đổi" từ lần phát hành trước
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
+      - name: Cài thư viện
+        run: npm ci --no-audit --no-fund
 
       - name: Chạy test
         run: npm test
@@ -36,11 +45,11 @@ jobs:
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
-            node -e "require('fs').writeFileSync('web/config.js','window.APP_CONFIG = '+JSON.stringify({supabaseUrl:process.env.SUPABASE_URL,supabaseAnonKey:process.env.SUPABASE_ANON_KEY})+';\n')"
+            node -e "require('fs').writeFileSync('web/public/config.js','window.APP_CONFIG = '+JSON.stringify({supabaseUrl:process.env.SUPABASE_URL,supabaseAnonKey:process.env.SUPABASE_ANON_KEY})+';\n')"
           fi
 
-      - name: Cài thư viện
-        run: npm install --no-audit --no-fund
+      - name: Dựng giao diện (Vite → thư mục dist, đây là webDir của Capacitor)
+        run: npm run build
 
       - name: Tạo dự án Android (thư mục android/ không lưu trong git)
         run: npx cap add android
@@ -48,7 +57,7 @@ jobs:
       - name: Tạo icon và màn hình khởi động từ assets/
         run: npx capacitor-assets generate --android
 
-      - name: Đồng bộ mã web vào dự án Android
+      - name: Đồng bộ giao diện đã dựng (dist/) vào dự án Android
         run: npx cap sync android
 
       # Số phiên bản tăng dần theo số lần chạy workflow (1.0.<số lần chạy>), để Android nhận ra đây là bản mới hơn.
@@ -76,6 +85,7 @@ jobs:
             keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey > /dev/null \
               || { echo "::error::DEBUG_KEYSTORE_BASE64 không đọc được (dán thiếu/thừa ký tự?)."; exit 1; }
             echo "Đã dùng khóa ký cố định."
+            echo "KEYSTORE_FIXED=1" >> "$GITHUB_ENV"
           else
             echo "::warning::Không có DEBUG_KEYSTORE_BASE64 — mỗi lần dựng sẽ có chữ ký khác (cài bản mới cần gỡ bản cũ)."
           fi
@@ -90,3 +100,40 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+      # Tag do workflow tự tạo (bằng GITHUB_TOKEN) sẽ không kích hoạt thêm lần chạy nào, nên không bị lặp vòng.
+      # Chạy lại cùng một lần (re-run) thì thay APK trong Release cũ chứ không tạo trùng.
+      - name: Đăng bản phát hành (Releases)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: ${{ github.run_number }}
+        run: |
+          VERSION="1.0.$RUN"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then TAG="$GITHUB_REF_NAME"; else TAG="v$VERSION"; fi
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p release
+          cp "$APK" "release/quan-ly-tai-chinh-$VERSION.apk"   # tên có số phiên bản, khỏi lẫn trong thư mục Tải xuống
+          cp "$APK" "release/quan-ly-tai-chinh.apk"            # tên cố định cho liên kết releases/latest/download/...
+
+          PREV=$(git describe --tags --abbrev=0 --match 'v*' "$GITHUB_SHA^" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then RANGE="$PREV..$GITHUB_SHA"; else RANGE="-15 $GITHUB_SHA"; fi
+          {
+            echo "APK Android **$VERSION**: tải \`quan-ly-tai-chinh-$VERSION.apk\` ở mục Assets bên dưới, mở file trên điện thoại để cài."
+            if [ -n "$KEYSTORE_FIXED" ]; then
+              echo "Cài đè lên bản cũ được, không cần gỡ app."
+            else
+              echo "⚠️ Bản này ký bằng khóa khác các bản trước: cần gỡ app cũ rồi mới cài."
+            fi
+            echo
+            echo "### Thay đổi"
+            git log --no-merges --pretty='- %s' $RANGE | head -30
+          } > release/NOTES.md
+          cat release/NOTES.md
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" release/*.apk --clobber
+            gh release edit "$TAG" --notes-file release/NOTES.md --latest
+          else
+            gh release create "$TAG" release/*.apk --target "$GITHUB_SHA" --title "Quản lý tài chính $VERSION" --notes-file release/NOTES.md --latest
+          fi

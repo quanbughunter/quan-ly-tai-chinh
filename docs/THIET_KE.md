@@ -77,8 +77,8 @@ Tất cả lưu trong một bảng `records(collection, data jsonb)` trên Supab
 
 | `kind` | Tài khoản | Công nợ với `partyId` |
 |---|---|---|
-| `income` | + `amount` | |
-| `expense` | − `amount` | |
+| `income` | + `amount` (nếu có tài khoản) | |
+| `expense` | − `amount` (nếu có tài khoản) | |
 | `transfer` | − `amount` ở `accountId`, + `toAmount` (mặc định = `amount`) ở `toAccountId`; khác tiền tệ thì là đổi ngoại tệ | |
 | `lend` (cho vay) | − `amount` (nếu có tài khoản) | người đó nợ mình **+** |
 | `repay_in` (được trả) | + `amount` | nợ **−** |
@@ -156,7 +156,13 @@ Mỗi tháng một dòng, mặc định **15.000 ₽** (đổi được trong C�
 | Đã nhận + chọn thẻ (Gazprom hoặc PSPB… — mọi thẻ ₽ trừ sổ tiết kiệm) | Ghi **một khoản thu ₽** vào thẻ đó, đúng **ngày thực nhận**; số dư thẻ tăng đúng số tiền |
 | Đã nhận + «Không cộng vào thẻ nào» | Không (dành cho tháng cũ mà số dư thẻ đã tính sẵn) |
 
-- Khoản thu gắn với tháng qua `scholarshipId`/`txId`: **đổi** số tiền, ngày hoặc thẻ thì khoản tự cập nhật; **bỏ tick «Đã nhận»** hoặc **xóa tháng** thì khoản tự biến mất. Khoản này không sửa tay ở màn hình Giao dịch (app dẫn về tháng gốc) — nên đừng thêm lại học bổng ở mục Giao dịch, sẽ bị tính hai lần.
+- Khoản thu gắn với tháng qua `scholarshipId`/`txId`: **đổi** số tiền, ngày hoặc thẻ thì khoản tự cập nhật; **bỏ tick «Đã nhận»** hoặc **xóa tháng** thì khoản tự biến mất. Khoản này không sửa tay ở màn hình Giao dịch (app dẫn về tháng gốc).
+- **Thêm học bổng từ nơi khác cũng tự vào mục này.** Khoản thu chọn danh mục «Học bổng» (nút «＋» → Khoản thu / Nhập nhanh, nút Thêm ở tab Giao dịch → Thu, ô nhập ở Tổng quan) không còn là khoản thu rời: hộp thoại hiện ô **«Ghi vào mục Học bổng MIIGAiK»** để nhập **ngày học bổng «có»**, **ngày thực nhận** (ô «Ngày» của form, hoặc ô riêng trong Nhập nhanh), **tháng** (mặc định theo ngày có, chưa có thì theo ngày nhận) và thẻ ₽. Lưu xong, mục Học bổng có đúng một dòng tháng + một khoản thu ₽ vào thẻ.
+  - Mỗi tháng chỉ một dòng: tháng đang chờ thì được đánh dấu đã nhận (giữ ngày có cũ nếu để trống); tháng đã nhận thì được cập nhật chứ **không cộng lần hai**. Học bổng luôn tính bằng ₽ và vào thẻ ₽ (không phải sổ tiết kiệm); chọn danh mục này thì form tự chuyển sang thẻ học bổng chọn sẵn. Ngày có không được sau ngày nhận.
+  - Bỏ tick ô «Ghi vào mục Học bổng» nếu chỉ muốn ghi một khoản thu thường (ví dụ học bổng khác, không phải MIIGAiK).
+  - Sửa một khoản thu cũ sang danh mục «Học bổng»: khoản đó được chuyển thành giao dịch của tháng (không tạo thêm khoản). Nếu tháng đó đã có khoản riêng thì form báo và chặn lưu, để khỏi tính hai lần.
+  - Các khoản thu «Học bổng» (₽) nhập từ trước chưa gắn tháng nào: mục Học bổng hiện lời nhắc **«Gắn … khoản vào các tháng»** (tạo tháng theo ngày của khoản, số dư thẻ không đổi). Khoản trùng với tháng đã có thì để nguyên cho bạn tự xử lý.
+  - Logic thuần và có kiểm thử: `validateScholarshipEntry`, `planScholarshipEntry`, `planAdoption`… trong `web/js/scholarship.js`; hộp «Ghi vào mục Học bổng» dùng chung ở `web/src/components/forms/scholarship-sync.jsx`.
 - Thẻ chọn sẵn là thẻ bạn chọn lần trước; lần đầu là thẻ có tên chứa "Gazprom", rồi "PSPB". Cài đặt có ô chọn thẻ mặc định.
 - 14 tháng nhập từ sheet cũ giữ nguyên, **không** có khoản cộng nào (số dư thẻ trong sheet cũ đã khớp). Khi mở một tháng cũ chưa nhận mà tick «Đã nhận», thẻ được chọn sẵn như tháng mới.
 
@@ -183,6 +189,15 @@ Mỗi **khoản chi** trong «Nhập nhanh» có thanh **Chia cho người trong
 - Mục **Thu nhập** (thanh bên; trên điện thoại ở «Khác», và liên kết ở thẻ tháng trong Tổng quan) liệt kê mọi giao dịch `income` của **mọi tài khoản** (kể cả «Sổ chi tiêu» lưu lương cũ), theo tháng hoặc toàn bộ thời gian, lọc theo tài khoản / nguồn thu, kèm tổng quy VND, tổng theo nguồn và theo từng tiền tệ gốc. Nhận trả nợ, đi vay, chuyển khoản không phải thu nhập nên không có ở đây. Logic tính ở `incomeStats` trong `web/js/calc.js`.
 - Tên tài khoản lưu lịch sử chi tiêu / lương cũ nay là «Sổ chi tiêu» (công cụ nhập đặt tên này cho lần nhập sau). Dữ liệu đã nhập từ trước thì đổi tên ngay trong app: **Tài khoản → mở tài khoản → Tên**.
 
+### Khoản thu / chi không gắn tài khoản
+
+Khoản chi và khoản thu có thể **không gắn tài khoản nào** (`accountId` rỗng): chọn «— Không gắn tài khoản —» ở ô Tài khoản của **Nhập nhanh** hoặc của form **Thêm giao dịch** (nhóm Chi / Thu). Khi đó:
+
+- Tiền tệ lấy từ chính khoản đó (form có ô chọn tiền tệ; Nhập nhanh mặc định VND, dòng nào ghi rõ `rub`, `usd`… thì giữ tiền tệ đó), nên không có cảnh báo «lệch tiền tệ với tài khoản».
+- **Không đổi số dư** của tài khoản nào (`accountBalances` bỏ qua giao dịch không có `accountId`), nhưng **vẫn tính vào thu chi của tháng**, thống kê theo danh mục, ngân sách và mục Thu nhập (các phép này chỉ nhìn `kind`, `date`, `categoryId`, `currency`).
+- Dùng cho khoản chi mà bạn không muốn trừ vào thẻ nào (ví dụ người khác trả hộ, hoặc chỉ cần ghi lại để theo dõi). Chuyển / đổi và Điều chỉnh số dư vẫn bắt buộc có tài khoản vì chúng chỉ có nghĩa khi gắn với số dư.
+- Chia khoản cho người trong Vay nợ và «Gửi cho bố» vẫn dùng được. Ghi các giao dịch thành bản ghi là việc của `web/js/quicksave.js` (hàm thuần, `tests/quicksave.test.js`); app nhớ tài khoản của lần trước chỉ khi bạn đã chọn một tài khoản thật.
+
 ## 6. Ánh xạ từ sheet cũ
 
 | Sheet cũ | Thành | Ghi chú |
@@ -203,28 +218,31 @@ Công cụ nhập (`tools/import_xlsx.mjs`, Node.js) chạy trên máy bạn, t�
 ## 7. Kiến trúc
 
 ```
-Trình duyệt / APK (cùng một mã nguồn trong web/)
-   │  HTML + JS thuần, không cần build; cài được như PWA
+Trình duyệt / APK (cùng một mã nguồn trong web/, Vite dựng thành dist/)
+   │  React 19 + Tailwind v4 + shadcn/ui + Lucide + Motion + Recharts; cài được như PWA
    │
    ├── đăng nhập email + mật khẩu ──► Supabase Auth (tắt đăng ký công khai)
    └── đọc/ghi records ────────────► Supabase Postgres + RLS (user_id = auth.uid())
 
-GitHub Pages ── chỉ phục vụ mã nguồn tĩnh (web/), tuyệt đối không có dữ liệu
-GitHub Actions ── dựng APK debug bằng Capacitor, xuất file tải về
+GitHub Pages ── chỉ phục vụ giao diện đã dựng (dist/), tuyệt đối không có dữ liệu
+GitHub Actions ── npm ci → chạy test → vite build → đưa dist/ lên Pages, hoặc dựng APK debug bằng Capacitor
 ```
 
+- **Hai tầng tách bạch.** Tầng *logic* (`web/js/`: `calc`, `money`, `dates`, `fx`, `deals`, `share`, `quickadd`, `quicksave`, `scholarship`, `store`…) là JavaScript thuần, không biết gì về giao diện và có test riêng (`npm test`). Tầng *giao diện* (`web/src/`) chỉ đọc dữ liệu qua `store` và gọi các hàm logic đó; vì vậy đổi giao diện không làm đổi một con số nào.
+- **Giao diện.** `web/src/app/` là khung (thanh bên trên máy tính, thanh tab + nút ＋ trên điện thoại, banner mạng, định tuyến theo `#hash`); `screens/` mỗi màn hình một tệp; `forms/` các biểu mẫu mở dạng hộp thoại (điện thoại: tấm trượt từ dưới lên; máy tính: hộp giữa màn hình); `components/ui/` là bộ thành phần kiểu shadcn viết tay trên `radix-ui` (Button, Input, Select, Checkbox, Switch, Modal, Segmented, Card, Badge, Progress…); `lib/` chứa hộp thoại xếp chồng, định tuyến, định dạng tiền (tôn trọng «ẩn số dư»), toast. Màu và bo góc là biến thiết kế (oklch) trong `web/src/index.css`, sáng/tối đổi bằng thuộc tính `data-theme` ở `<html>`. Biểu đồ dùng Recharts, chuyển động dùng Motion (tự giảm khi hệ điều hành bật «giảm chuyển động»). Quy ước chi tiết: `web/src/DESIGN.md`.
+- **Dựng (build).** `npm run build` (Vite) ghi `dist/`: gói JS/CSS có băm tên, phông Plus Jakarta Sans đóng kèm (CSP `default-src 'self'` chặn phông Google), và chép nguyên `web/public/` (cấu hình, manifest, icon, service worker). Plugin trong `vite.config.js` điền danh sách tệp vào `sw.js` và đổi tên bộ nhớ đệm theo từng bản dựng nên người dùng luôn nhận bản mới. Đường dẫn trong bản dựng đều tương đối (`./assets/…`) để chạy được cả ở thư mục con của GitHub Pages lẫn trong WebView của APK. Cần Android WebView hiện đại (Chrome 111 trở lên) vì Tailwind v4 dùng màu oklch và `@layer`.
 - **Ngoại tuyến:** sau lần tải đầu, app lưu bản sao để mở được khi mất mạng (chỉ xem). Ghi dữ liệu yêu cầu có mạng.
 - **Hai thiết bị cùng sửa:** bản ghi nào sửa sau thì thắng (đủ dùng cho một người).
 - **Chế độ thử:** nếu chưa cấu hình Supabase, app chạy bằng dữ liệu trên máy để bạn thử ngay.
-- **Nút Back (vuốt cạnh) trên Android:** Capacitor 6 không tự xử lý nút Back; thiếu plugin `@capacitor/app` thì Android đóng luôn app, kể cả khi đang mở form. App cài plugin này và nghe sự kiện `backButton` (`web/js/backnav.js`): đóng hộp thoại trên cùng → lùi về màn trước (lịch sử `#hash`) → ở màn đầu thì thu app xuống nền. Vì có thêm plugin gốc nên phải dựng APK mới; bản web trong trình duyệt giữ nguyên nút Back của trình duyệt.
+- **Nút Back (vuốt cạnh) trên Android:** Capacitor 6 không tự xử lý nút Back; thiếu plugin `@capacitor/app` thì Android đóng luôn app, kể cả khi đang mở form. App cài plugin này và nghe sự kiện `backButton` (`web/js/backnav.js`): đóng hộp thoại trên cùng (`closeTopDialog` trong `web/src/lib/dialogs.jsx`, kể cả danh sách chọn đang mở) → lùi về màn trước (lịch sử `#hash`) → ở màn đầu thì thu app xuống nền. Vì có thêm plugin gốc nên phải dựng APK mới; bản web trong trình duyệt giữ nguyên nút Back của trình duyệt.
 
 ### Logo và icon
 
 Logo **QLTC** vẽ bằng SVG (không dùng phông chữ): **Q** và **C** là hai vòng chồng lên nhau (Q nằm trên, C tím nhạt nằm dưới), **L** và **T** dùng chung một thanh ngang (chân chữ L chính là thanh ngang chữ T), đuôi chữ Q vắt qua góc chữ L với một khe hở nhỏ để thấy chỗ lồng nhau. Nền chàm, Q trắng, L·T hồng san hô.
 
-- Nguồn duy nhất: `tools/make_logo.py` (màu, độ dày nét, độ dài đuôi Q nằm ở đầu file). Chạy lại sẽ ghi `web/icons/icon.svg` và các PNG: `icon-192/512`, `icon-maskable-512`, `apple-touch-icon` (web/PWA) và `assets/icon-only|foreground|background.png` (Android).
+- Nguồn duy nhất: `tools/make_logo.py` (màu, độ dày nét, độ dài đuôi Q nằm ở đầu file). Chạy lại sẽ ghi `web/public/icons/icon.svg` và các PNG: `icon-192/512`, `icon-maskable-512`, `apple-touch-icon` (web/PWA) và `assets/icon-only|foreground|background.png` (Android).
 - Icon Android do workflow tự dựng bằng `capacitor-assets` từ ba PNG trong `assets/`; lớp foreground thu nhỏ để nằm trong vùng an toàn nên không bị cắt ở launcher dạng tròn.
-- Trong app, logo là ảnh `icons/icon.svg` ở thanh bên và màn hình đăng nhập (thay cho biểu tượng 💸 cũ). `tests/assets.test.js` kiểm tra mọi icon mà manifest, `index.html` và `sw.js` nhắc tới đều có thật.
+- Trong app, logo là ảnh `icons/icon.svg` ở thanh bên và màn hình đăng nhập (thay cho biểu tượng 💸 cũ). `tests/assets.test.js` kiểm tra mọi icon mà manifest và `index.html` nhắc tới đều có thật, `sw.js` còn đủ dấu để plugin điền danh sách tệp, và workflow dựng đúng thứ tự.
 
 ## 8. Cần bạn xác nhận (mình đã giả định và đánh dấu trong app)
 

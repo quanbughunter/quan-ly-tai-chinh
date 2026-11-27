@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseAmount, parseExpr, fmtMoney, fmtNum, roundTo, impliedRate } from '../web/js/money.js';
+import { parseAmount, parseExpr, fmtMoney, fmtNum, roundTo, impliedRate, roundCur, toEditable } from '../web/js/money.js';
 
 test('parseAmount: hậu tố k / tr / tỷ', () => {
   assert.equal(parseAmount('25k'), 25000);
@@ -59,4 +59,53 @@ test('impliedRate: viết "1 đơn vị lớn = n đơn vị nhỏ", thiếu s�
   assert.equal(impliedRate('', 'VND', 300, 'USD'), '');
   assert.equal(impliedRate(100, 'USD', 100, 'USD'), '');
   assert.equal(impliedRate(0, 'VND', 300, 'USD'), '');
+});
+
+test('máy tính: nhân chia và ngoặc, vẫn dùng k / tr', () => {
+  const v = (x) => { const r = parseExpr(x); return r ? r.total : null; };
+  assert.equal(v('45k*3'), 135_000);
+  assert.equal(v('450k/3'), 150_000);
+  assert.equal(v('2×3'), 6);
+  assert.equal(v('10÷4'), 2.5);
+  assert.equal(v('3x25k'), 75_000);          // x đứng giữa hai số = nhân
+  assert.equal(v('3 x 25k'), 75_000);
+  assert.equal(v('3trx2'), 6_000_000);       // "tr" rồi x
+  assert.equal(v('1,5tr*2'), 3_000_000);
+  assert.equal(v('1.500.000/3'), 500_000);
+  assert.equal(v('(2tr+500k)*2'), 5_000_000);
+  assert.equal(v('10-(2+3)*2'), 0);
+  assert.equal(v('=-3k+5k*1'), 2_000);
+});
+
+test('máy tính: đúng thứ tự phép tính, nhân chia trước cộng trừ', () => {
+  assert.equal(parseExpr('2tr+300k*2').total, 2_600_000);
+  assert.equal(parseExpr('2tr-300k/3').total, 1_900_000);
+  assert.equal(parseExpr('(2tr-300k)/2').total, 850_000);
+  assert.equal(parseExpr('-(1+2)*3').total, -9);
+});
+
+test('máy tính: biểu thức sai hoặc chia cho 0 thì trả null', () => {
+  for (const bad of ['1/0', '(1+2', '1+2)', '5*', '*5', 'x3', '12xyz', '3*abc', '()', '2k*', '1/(2-2)']) {
+    assert.equal(parseExpr(bad), null, bad);
+  }
+});
+
+test('máy tính: cộng trừ thuần giữ nguyên cách trả parts cũ', () => {
+  assert.equal(parseExpr('3tr+500k-120000').parts.length, 3);
+  assert.deepEqual(parseExpr('45k*3').parts, [135_000]);
+});
+
+test('roundCur: VND làm tròn đồng, ngoại tệ 2 số lẻ, tỷ giá (tiền tệ rỗng) giữ nguyên', () => {
+  assert.equal(roundCur(666666.666667, 'VND'), 666_667);
+  assert.equal(roundCur(12.3456, 'USD'), 12.35);
+  assert.equal(roundCur(26.12345, ''), 26.12345);
+});
+
+test('toEditable: đưa vào ô nhập rồi đọc lại ra đúng số cũ', () => {
+  for (const [n, cur] of [[135000, 'VND'], [666666.666667, 'VND'], [12.5, 'USD'], [-0.25, 'USD'], [1.234, ''], [0.5, ''], [1234.567, ''], [26.3, ''], [0, 'VND']]) {
+    const t = toEditable(n, cur);
+    assert.equal(parseExpr(t).total, cur ? roundCur(n, cur) : n, `${n} ${cur} → "${t}"`);
+  }
+  assert.equal(toEditable(1.234, ''), '1.2340');   // tránh bị đọc thành 1234
+  assert.equal(toEditable(NaN), '');
 });

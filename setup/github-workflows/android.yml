@@ -20,12 +20,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
+      - name: Cài thư viện
+        run: npm ci --no-audit --no-fund
 
       - name: Chạy test
         run: npm test
@@ -36,11 +40,11 @@ jobs:
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
-            node -e "require('fs').writeFileSync('web/config.js','window.APP_CONFIG = '+JSON.stringify({supabaseUrl:process.env.SUPABASE_URL,supabaseAnonKey:process.env.SUPABASE_ANON_KEY})+';\n')"
+            node -e "require('fs').writeFileSync('web/public/config.js','window.APP_CONFIG = '+JSON.stringify({supabaseUrl:process.env.SUPABASE_URL,supabaseAnonKey:process.env.SUPABASE_ANON_KEY})+';\n')"
           fi
 
-      - name: Cài thư viện
-        run: npm install --no-audit --no-fund
+      - name: Dựng giao diện (Vite → thư mục dist, đây là webDir của Capacitor)
+        run: npm run build
 
       - name: Tạo dự án Android (thư mục android/ không lưu trong git)
         run: npx cap add android
@@ -48,7 +52,7 @@ jobs:
       - name: Tạo icon và màn hình khởi động từ assets/
         run: npx capacitor-assets generate --android
 
-      - name: Đồng bộ mã web vào dự án Android
+      - name: Đồng bộ giao diện đã dựng (dist/) vào dự án Android
         run: npx cap sync android
 
       # Số phiên bản tăng dần theo số lần chạy workflow (1.0.<số lần chạy>), để Android nhận ra đây là bản mới hơn.
