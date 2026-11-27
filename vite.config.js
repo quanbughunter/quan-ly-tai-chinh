@@ -7,6 +7,15 @@ import { join, relative, resolve, sep } from 'node:path';
 
 const ROOT = resolve('web');
 
+// Thông tin phiên bản nhúng vào app (hiện ở Cài đặt và màn Đăng nhập — xem web/js/appinfo.js).
+// Trên GitHub Actions có sẵn GITHUB_RUN_NUMBER và GITHUB_SHA; dựng trên máy thì ghi "dev"/"local".
+const CI_RUN = process.env.GITHUB_ACTIONS === 'true' ? process.env.GITHUB_RUN_NUMBER : '';
+const APP_INFO = {
+  version: CI_RUN ? `1.0.${CI_RUN}` : 'dev',
+  commit: process.env.GITHUB_SHA ? process.env.GITHUB_SHA.slice(0, 7) : 'local',
+  builtAt: new Date().toISOString(),
+};
+
 /** Sau khi dựng: ghi danh sách tệp vào sw.js để mở được khi mất mạng ngay từ lần mở đầu tiên. */
 function precacheManifest() {
   const walk = (dir) => readdirSync(dir).flatMap((f) => {
@@ -35,6 +44,7 @@ export default defineConfig({
   root: ROOT,
   base: './',
   publicDir: 'public',
+  define: { __APP_INFO__: JSON.stringify(APP_INFO) },
   plugins: [react(), tailwindcss(), precacheManifest()],
   resolve: { alias: { '@': join(ROOT, 'src'), '@logic': join(ROOT, 'js') } },
   build: { outDir: resolve('dist'), emptyOutDir: true, target: 'es2020', chunkSizeWarningLimit: 1200, assetsInlineLimit: 0 },

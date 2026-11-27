@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Eye, EyeOff, LoaderCircle, LogIn, ShieldCheck } from 'lucide-react';
 import { store } from '@/lib/store-hooks.js';
+import { useAppInfo } from '@/lib/app-info.js';
 import { navigate } from '@/lib/route.js';
 import { errMsg } from '@/lib/format.js';
 import { Button } from '@/components/ui/button.jsx';
@@ -9,6 +10,7 @@ import { Field } from '@/components/ui/field.jsx';
 import { Input } from '@/components/ui/input.jsx';
 
 export default function Login() {
+  const build = useAppInfo();
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [show, setShow] = useState(false);
@@ -97,6 +99,7 @@ export default function Login() {
         </div>
 
         <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="size-3.5" />Kết nối được bảo vệ</p>
+        <p data-testid="login-version" className="tnum mt-1.5 text-center text-[11px] text-muted-foreground/80">{build.line}</p>
       </motion.form>
     </div>
   );

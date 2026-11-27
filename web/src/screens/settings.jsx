@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Cloud, Database, Download, FlaskConical, Layers, LogOut, Plus, RefreshCw, Repeat, GraduationCap, Eye, Sigma, Tags, Target, Trash2, Upload, Sparkles } from 'lucide-react';
+import { Cloud, Copy, Database, Download, FlaskConical, Info, Layers, LogOut, Plus, RefreshCw, Repeat, GraduationCap, Eye, Sigma, Tags, Target, Trash2, Upload, Sparkles } from 'lucide-react';
 import { CURRENCIES } from '@logic/money.js';
 import { todayStr } from '@logic/dates.js';
 import { COLLECTIONS } from '@logic/model.js';
@@ -9,6 +9,7 @@ import { getTheme, setTheme } from '@logic/theme.js';
 import { store, useStore } from '@/lib/store-hooks.js';
 import { money, errMsg, download } from '@/lib/format.js';
 import { accountOptions } from '@/lib/options.js';
+import { useAppInfo } from '@/lib/app-info.js';
 import { confirmBox } from '@/lib/dialogs.jsx';
 import { toast } from '@/lib/toast.js';
 import { PageHeader } from '@/components/page-header.jsx';
@@ -224,9 +225,29 @@ function DataCard() {
   );
 }
 
+function AboutCard({ build }) {
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(build.line); toast('Đã sao chép số phiên bản.', 'ok'); } catch { toast('Không sao chép được — hãy chép tay dòng phiên bản.', 'error'); }
+  };
+  const Item = ({ label, value, mono, testid }) => (
+    <div className="min-w-0"><dt className="text-xs font-semibold text-muted-foreground">{label}</dt><dd data-testid={testid} className={`mt-0.5 truncate text-[15px] font-bold ${mono ? 'font-mono tnum' : ''}`}>{value || '—'}</dd></div>
+  );
+  return (
+    <Section title={<T icon={Info}>Phiên bản</T>} right={<Button variant="ghost" size="sm" onClick={copy}><Copy />Sao chép</Button>}>
+      <dl className="grid gap-3 sm:grid-cols-2" data-testid="about-card">
+        <Item label="Phiên bản" value={build.version} testid="app-version" />
+        <Item label="Chạy trên" value={build.platform} testid="app-platform" />
+        <Item label="Mã bản dựng" value={build.commit} mono testid="app-commit" />
+        <Item label="Dựng lúc" value={build.when} testid="app-built" />
+      </dl>
+    </Section>
+  );
+}
+
 /* ───────── Màn hình ───────── */
 export default function Settings() {
   useStore();
+  const build = useAppInfo();
   const s = store.settings();
   return (
     <div>
@@ -243,9 +264,10 @@ export default function Settings() {
           <CategoriesCard />
           <BudgetsCard />
           <DataCard />
+          <AboutCard build={build} />
         </div>
       </motion.div>
-      <p className="mt-6 text-center text-xs text-muted-foreground">Quản lý tài chính · bản 2.0 · tiền được tính từ sổ giao dịch, không nhập tay số dư.</p>
+      <p className="mt-6 text-center text-xs text-muted-foreground">{`Quản lý tài chính · ${build.version} · `}tiền được tính từ sổ giao dịch, không nhập tay số dư.</p>
     </div>
   );
 }

@@ -179,6 +179,13 @@ async def main():
         await pg.locator('#view').get_by_role('tab', name='Sáng').click()
         check('chọn Sáng đổi data-theme', await pg.evaluate("document.documentElement.getAttribute('data-theme')") == 'light')
 
+        # Cài đặt: thẻ Phiên bản (bản dựng thử: "bản thử", chạy trên Web, mã local)
+        about = pg.get_by_test_id('about-card')
+        check('cài đặt có thẻ Phiên bản', await about.count() == 1)
+        check('thẻ Phiên bản: bản thử · Web · mã trống', (await about.get_by_test_id('app-version').inner_text()) == 'bản thử'
+              and (await about.get_by_test_id('app-platform').inner_text()) == 'Web'
+              and (await about.get_by_test_id('app-commit').inner_text()) == '—')
+
         # Báo tỉ giá: Sang 6.000.000 ₫
         await goto(pg, 'fx')
         inp = pg.locator('#view input').first
