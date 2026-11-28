@@ -62,6 +62,17 @@ test('chế độ mặc định không đổi: không có + vẫn là chi', () =
   assert.equal(parseQuick('lương 11tr')[0].kind, 'expense');
 });
 
+test('Nhập nhanh hiểu kiểu gõ 5tr2, 5k3', () => {
+  const r = parseQuick('tiền nhà 5tr2, bánh mì 5k3; +lương 12tr5');
+  assert.deepEqual(r.map((x) => x.amount), [5_200_000, 5_300, 12_500_000]);
+  assert.deepEqual(r.map((x) => x.note), ['tiền nhà', 'bánh mì', 'lương']);
+  assert.deepEqual(r.map((x) => x.kind), ['expense', 'expense', 'income']);
+  // có dấu cách thì vẫn như cũ: "25k 2 ly" là 25k, "2 ly" nằm trong ghi chú
+  const [c] = parseQuick('cafe 25k 2 ly');
+  assert.equal(c.amount, 25_000);
+  assert.equal(c.note, 'cafe 2 ly');
+});
+
 test('nhân chia ngay trong ô Nhập nhanh: 25k*2, 450k/3, 35k x 4', () => {
   const r = parseQuick('cafe 25k*2, ăn tối 450k/3; bia 35k x 4; kẹo 1tr ÷ 3');
   assert.deepEqual(r.map((x) => x.amount), [50_000, 150_000, 140_000, 333_333]);

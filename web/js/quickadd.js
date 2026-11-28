@@ -5,8 +5,9 @@ import { parseExpr, roundCur, SUFFIX_WORDS } from './money.js';
 import { fold } from './calc.js';
 
 const SUFFIX_RE = [...SUFFIX_WORDS].sort((a, b) => b.length - a.length).join('|');
-// Một số tiền (có thể kèm k/tr/tỷ). Cho phép nối bằng nhân/chia: "25k*2", "450k/3", "35k x 4", "1tr ÷ 3".
-const NUM = `\\d[\\d.,]*(?:\\s*(?:${SUFFIX_RE})(?![\\p{L}\\d]))?`;
+// Một số tiền (có thể kèm k/tr/tỷ, kể cả "5tr2", "5k3" — chữ số liền sau đơn vị là phần lẻ).
+// Cho phép nối bằng nhân/chia: "25k*2", "450k/3", "35k x 4", "1tr ÷ 3".
+const NUM = `\\d[\\d.,]*(?:\\s*(?:${SUFFIX_RE})\\d*(?![\\p{L}\\d]))?`;
 const AMOUNT_RE = new RegExp(`(?<![\\p{L}\\d])([+-]?${NUM}(?:\\s*[*×÷/x]\\s*${NUM})*)(?![\\p{L}\\d])`, 'iu');
 const CUR_RE = /(?:^|\s)(rub|rúp|rup|usdt|usd|vnd)(?=\s|$)|([₽$₫])/giu;
 

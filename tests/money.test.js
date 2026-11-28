@@ -28,6 +28,45 @@ test('parseAmount: sai định dạng', () => {
   assert.ok(Number.isNaN(parseAmount('')));
 });
 
+test('kiểu gõ 5tr2 / 5k3: chữ số sau đơn vị là phần lẻ của đơn vị', () => {
+  assert.equal(parseAmount('5tr2'), 5_200_000);
+  assert.equal(parseAmount('5tr25'), 5_250_000);
+  assert.equal(parseAmount('5tr250'), 5_250_000);     // 5 triệu 250 nghìn
+  assert.equal(parseAmount('5tr05'), 5_050_000);
+  assert.equal(parseAmount('5tr050'), 5_050_000);
+  assert.equal(parseAmount('5tr002500'), 5_002_500);
+  assert.equal(parseAmount('5k3'), 5_300);
+  assert.equal(parseAmount('5k35'), 5_350);
+  assert.equal(parseAmount('5k050'), 5_050);
+  assert.equal(parseAmount('12k5'), 12_500);
+  assert.equal(parseAmount('1tỷ2'), 1_200_000_000);
+  assert.equal(parseAmount('1tỷ25'), 1_250_000_000);
+  assert.equal(parseAmount('5củ2'), 5_200_000);
+  assert.equal(parseAmount('5 triệu2'), 5_200_000);
+  assert.equal(parseAmount('-5tr2'), -5_200_000);
+  assert.equal(parseAmount('5TR2'), 5_200_000);
+});
+
+test('kiểu gõ 5tr2: các trường hợp không hiểu thì báo sai, không đoán bừa', () => {
+  assert.ok(Number.isNaN(parseAmount('5k3456')));     // k chỉ có 3 chữ số lẻ
+  assert.ok(Number.isNaN(parseAmount('5tr1234567'))); // tr chỉ có 6
+  assert.ok(Number.isNaN(parseAmount('1,5tr2')));     // đã có dấu phẩy thì không thêm phần lẻ
+  assert.ok(Number.isNaN(parseAmount('5đ2')));        // đ không có phần lẻ
+  assert.ok(Number.isNaN(parseAmount('5xyz2')));
+});
+
+test('kiểu gõ 5tr2 trong biểu thức và máy tính', () => {
+  assert.equal(parseExpr('5tr2').total, 5_200_000);
+  assert.equal(parseExpr('5tr2+300k').total, 5_500_000);
+  assert.equal(parseExpr('10tr-5k3').total, 9_994_700);
+  assert.equal(parseExpr('5k3*2').total, 10_600);
+  assert.equal(parseExpr('5k3x2').total, 10_600);
+  assert.equal(parseExpr('(5tr2+800k)/2').total, 3_000_000);
+  assert.equal(parseExpr('5 tr 2').total, 5_200_000);
+  assert.equal(parseExpr('3trx2').total, 6_000_000);   // "trx2" vẫn là nhân 2 như cũ
+  assert.equal(parseExpr('5k3456'), null);
+});
+
 test('parseExpr: biểu thức giống ô `vnd`!D', () => {
   // giá trị đã tính trong file Excel: =-3830-10210-16025 → -30065
   assert.equal(parseExpr('=-3830-10210-16025').total, -30065);

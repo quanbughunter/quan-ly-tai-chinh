@@ -5,7 +5,7 @@ import { Input } from './input.jsx';
 import { CalcPad, CalcToggle } from './calc-pad.jsx';
 
 /**
- * Đọc số từ chuỗi người dùng gõ ("25k", "1,5tr", "3tr+500k-120000", "45k*3", "(2tr+500k)/4"); NaN nếu không hiểu.
+ * Đọc số từ chuỗi người dùng gõ ("25k", "1,5tr", "5tr2" = 5,2tr, "5k3" = 5.300, "3tr+500k-120000", "45k*3", "(2tr+500k)/4"); NaN nếu không hiểu.
  * Truyền currency để làm tròn đúng số lẻ của tiền tệ (VND: đồng; còn lại 2 số lẻ), ví dụ "2tr/3" → 666.667 ₫.
  */
 export function readAmount(text, currency = '') {

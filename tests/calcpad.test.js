@@ -55,6 +55,22 @@ test('xóa lùi: bỏ cả "tr" / "tỷ" một lần; xóa hết', () => {
   assert.equal(press(['clear'], '45k×3'), '');
 });
 
+test('bấm số sau k / tr / tỷ là phần lẻ: 5 tr 2 → 5tr2 = 5,2 triệu', () => {
+  assert.equal(press(['5', 'tr', '2']), '5tr2');
+  assert.equal(parseExpr(press(['5', 'tr', '2'])).total, 5_200_000);
+  assert.equal(press(['5', 'k', '3']), '5k3');
+  assert.equal(press(['5', 'k', '3', '4', '5', '6']), '5k345');         // k tối đa 3 chữ số lẻ
+  assert.equal(press(['5', 'tr', '2', '000']), '5tr2000');
+  assert.equal(press(['5', 'k', '3', '000']), '5k3');                   // quá chỗ thì không gõ
+  assert.equal(press(['5', 'tr', '2', 'k']), '5tr2');                   // không gõ chồng đơn vị
+  assert.equal(press(['5', 'tr', '2', ',']), '5tr2');                   // không thêm dấu phẩy
+  assert.equal(press(['1', ',', '5', 'tr', '2']), '1,5tr');             // 1,5tr đã có phần lẻ
+  assert.equal(press(['5', 'tr', '2', '+', '3', '0', '0', 'k']), '5tr2+300k');
+  assert.equal(parseExpr(press(['5', 'tr', '2', '+', '3', '0', '0', 'k'])).total, 5_500_000);
+  assert.equal(press(['back'], '5tr2'), '5tr');
+  assert.equal(press(['5', 'tr', '2', '(']), '5tr2×(');
+});
+
 test('mọi chuỗi bàn phím tạo ra đều đọc được (hoặc chưa xong), và "=" quay lại số đọc được', () => {
   const t = press(['4', '5', '0', 'k', '÷', '3']);
   const r = parseExpr(t);

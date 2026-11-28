@@ -88,16 +88,30 @@ function parseNumeric(t, hasSuffix) {
   return sign * v;
 }
 
-/** "25k" → 25000, "1,5tr" → 1500000, "1.500.000" → 1500000, "12.5" → 12.5. Trả NaN nếu không đọc được. */
+/**
+ * Kiểu gõ "5tr2" = 5,2 triệu; "5k3" = 5.300; "1tỷ25" = 1,25 tỷ; "5tr050" = 5.050.000.
+ * Chữ số sau đơn vị là phần lẻ của đơn vị đó (giống viết 5,2tr). Phần trước đơn vị phải là số nguyên,
+ * và phần sau không dài hơn số chữ số 0 của đơn vị (k: 3, tr: 6, tỷ: 9) — quá thì coi là gõ sai.
+ */
+function unitWithTail(head, mult, tail) {
+  const zeros = Math.round(Math.log10(mult));
+  if (!(mult > 1) || !/^[+-]?\d+$/.test(head) || tail.length > zeros) return NaN;
+  const sign = head[0] === '-' ? -1 : 1;
+  const whole = Number(head.replace(/^[+-]/, ''));
+  return roundTo(sign * (whole * mult + Number(tail) * 10 ** (zeros - tail.length)), 6);
+}
+
+/** "25k" → 25000, "1,5tr" → 1500000, "5tr2" → 5200000, "5k3" → 5300, "1.500.000" → 1500000, "12.5" → 12.5. Trả NaN nếu không đọc được. */
 export function parseAmount(str) {
   if (typeof str === 'number') return str;
-  const m = String(str ?? '').trim().toLowerCase().match(/^([+-]?[\d.,]+)\s*([\p{L}₫]+)?$/u);
+  const m = String(str ?? '').trim().toLowerCase().match(/^([+-]?[\d.,]+)\s*([\p{L}₫]+)?(\d+)?$/u);
   if (!m) return NaN;
   let mult = 1;
   if (m[2]) {
     if (!(m[2] in SUFFIX)) return NaN;
     mult = SUFFIX[m[2]];
   }
+  if (m[3]) return unitWithTail(m[1], mult, m[3]);
   const n = parseNumeric(m[1], !!m[2] && mult !== 1);
   return Number.isNaN(n) ? NaN : roundTo(n * mult, 6);
 }
@@ -130,6 +144,9 @@ function tokenizeCalc(s) {
       else if (word.length > 1 && word.endsWith('x') && word.slice(0, -1) in SUFFIX) suffix = word.slice(0, -1); // "3trx2"
       else if (word[0] !== 'x') return null;
       i += suffix.length;
+      // "5tr2", "5k3": chữ số liền sau đơn vị là phần lẻ của đơn vị (chỉ khi đơn vị đứng riêng, không phải "trx")
+      const tail = suffix === word && SUFFIX[suffix] > 1 ? /^\d+/.exec(s.slice(i)) : null;
+      if (tail) { suffix += tail[0]; i += tail[0].length; }
     }
     const v = parseAmount(m[0] + suffix);
     if (Number.isNaN(v)) return null;

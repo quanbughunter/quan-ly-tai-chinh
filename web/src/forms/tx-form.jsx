@@ -279,7 +279,7 @@ function TxForm({ init }) {
           </Field>
         ) : null}
 
-        <Field label={`${amtLabel}${cur && (a || isDebt || noAcc) ? ` (${cur})` : ''}`} hint="Gõ được: 25k, 1,5tr, 3tr+500k, 45k*3, 450k/3 — hoặc bấm nút máy tính bên phải ô.">
+        <Field label={`${amtLabel}${cur && (a || isDebt || noAcc) ? ` (${cur})` : ''}`} hint="Gõ được: 25k, 1,5tr, 5tr2, 3tr+500k, 45k*3, 450k/3 — hoặc bấm nút máy tính bên phải ô.">
           <MoneyInput value={st.amount} onChange={(v) => patch({ amount: v })} currency={cur} />
         </Field>
 
